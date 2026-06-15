@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>项目管理甘特图 · 子任务人员与完成优化</title>
+    <title>项目管理甘特图 · 云端同步版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* ========== 你的全部原始样式（保持原样，无删减） ========== */
         :root {
             --bg: #f4f6f9;
             --card: #ffffff;
@@ -46,7 +48,7 @@
         .btn-danger { color: var(--danger); border-color: var(--danger); } .btn-danger:hover { background: #fef2f2; }
         .btn-xs { padding: 2px 8px; font-size: 0.7rem; border-radius: 6px; }
         .main-container { display: flex; flex: 1; overflow: hidden; }
-        /* 侧边栏 */
+
         .sidebar {
             width: 420px; min-width: 420px; background: var(--card); border-right: 1px solid var(--border);
             display: flex; flex-direction: column; overflow-y: auto; box-shadow: var(--shadow); z-index: 10;
@@ -84,7 +86,7 @@
         .subtask-add input { flex: 1; padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border); }
         .person-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; background: #f1f5f9; }
         .person-dot { width: 7px; height: 7px; border-radius: 50%; }
-        /* 甘特图区域 */
+
         .gantt-area { flex: 1; display: flex; flex-direction: column; background: #fff; }
         .gantt-toolbar {
             display: flex; align-items: center; justify-content: space-between;
@@ -127,464 +129,649 @@
         .gantt-bar span { position: relative; z-index: 1; }
         .today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--today-color); z-index: 10; pointer-events: none; }
         .today-line::after { content: '今天'; position: absolute; top: -16px; left: -10px; font-size: 0.6rem; color: var(--today-color); font-weight: 700; }
-        /* 绿色完成任务 */
         .gantt-bar.task-done { background: #10b981 !important; }
         .status-badge { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 0.65rem; font-weight: 600; }
         .status-done { background: #d1fae5; color: #065f46; }
         .status-progress { background: #fff3e0; color: #9a3412; }
         .status-todo { background: #f1f5f9; color: #475569; }
-        @media (max-width: 1000px) {
-            .sidebar { width: 360px; min-width: 360px; }
-            :root { --left-w: 280px; }
+
+        /* 登录界面样式 */
+        .login-container {
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; background: var(--bg);
         }
-        @media (max-width: 700px) {
-            .main-container { flex-direction: column; }
-            .sidebar { width: 100%; min-width: 100%; max-height: 45vh; }
+        .login-card {
+            background: var(--card); padding: 32px; border-radius: var(--radius);
+            box-shadow: var(--shadow-md); width: 360px; text-align: center;
         }
+        .login-card h2 { margin-bottom: 8px; }
+        .login-card p { margin-bottom: 20px; font-size: 0.85rem; color: var(--text-light); }
+        .login-card input {
+            width: 100%; margin-bottom: 12px; padding: 10px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+        }
+        .login-card button { width: 100%; margin-top: 6px; }
+
+        @media (max-width: 1000px) { .sidebar { width: 360px; min-width: 360px; } :root { --left-w: 280px; } }
+        @media (max-width: 700px) { .main-container { flex-direction: column; } .sidebar { width: 100%; min-width: 100%; max-height: 45vh; } }
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="logo"><div class="icon">📊</div><span>项目管理甘特图</span></div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="btn btn-success btn-xs" onclick="manualSave()">💾 保存</button>
-        <button class="btn btn-outline btn-xs" onclick="loadDemoData()">✨ 示例</button>
-        <button class="btn btn-outline btn-xs" onclick="exportData()">📥 导出</button>
-        <label class="btn btn-outline btn-xs" style="cursor:pointer;">📤 导入<input type="file" accept=".json" hidden onchange="importData(event)"></label>
-        <button class="btn btn-danger btn-xs" onclick="clearAllData()">🗑 清空</button>
+
+<!-- 登录界面（未登录时显示） -->
+<div id="loginPanel" class="login-container">
+    <div class="login-card">
+        <h2>📊 甘特图 · 云端同步</h2>
+        <p>登录后数据自动保存到云端，多设备同步</p>
+        <input type="email" id="loginEmail" placeholder="邮箱" autocomplete="email">
+        <input type="password" id="loginPassword" placeholder="密码">
+        <button class="btn btn-primary" id="btnLogin">登录</button>
+        <button class="btn btn-outline" id="btnSignup" style="margin-top: 10px;">注册新账号</button>
     </div>
-</header>
+</div>
 
-<div class="main-container">
-    <!-- 侧边栏 -->
-    <aside class="sidebar">
-        <div class="sidebar-section">
-            <div class="section-title"><span class="dot search"></span> 查询过滤</div>
-            <input type="text" id="searchKeyword" placeholder="搜索任务/项目/人员..." oninput="applyFilter()" style="width:100%;">
+<!-- 甘特图主界面（登录后显示） -->
+<div id="ganttApp" style="display: none;">
+    <header class="header">
+        <div class="logo"><div class="icon">📊</div><span>项目管理甘特图 · 云端同步</span></div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <span id="userEmailSpan" style="font-size: 0.8rem; color: var(--text-light);"></span>
+            <button class="btn btn-outline btn-xs" id="btnLogout">🚪 退出</button>
+            <button class="btn btn-success btn-xs" onclick="manualSave()">💾 保存</button>
+            <button class="btn btn-outline btn-xs" onclick="loadDemoData()">✨ 示例</button>
+            <button class="btn btn-outline btn-xs" onclick="exportData()">📥 导出</button>
+            <label class="btn btn-outline btn-xs" style="cursor:pointer;">📤 导入<input type="file" accept=".json" hidden onchange="importData(event)"></label>
+            <button class="btn btn-danger btn-xs" onclick="clearAllData()">🗑 清空</button>
         </div>
-        <div class="sidebar-section">
-            <div class="section-title"><span class="dot people"></span> 人员管理</div>
-            <div class="input-row">
-                <input type="text" id="personName" placeholder="姓名" style="flex:2;">
-                <input type="color" id="personColor" value="#3b82f6" style="width:40px; height:36px;">
-                <button class="btn btn-primary btn-xs" onclick="addPerson()">+</button>
-            </div>
-            <ul id="peopleList" style="list-style:none; margin-top:8px; font-size:0.8rem;"></ul>
-        </div>
-        <div class="sidebar-section">
-            <div class="section-title"><span class="dot project"></span> 项目</div>
-            <div class="input-row">
-                <input type="text" id="projectName" placeholder="项目名称" style="flex:2;">
-                <button class="btn btn-primary btn-xs" onclick="addProject()">+</button>
-            </div>
-            <ul id="projectsList" style="list-style:none; margin-top:8px; font-size:0.8rem;"></ul>
-        </div>
-        <div class="sidebar-section">
-            <div class="section-title"><span class="dot task"></span> 新建任务</div>
-            <div class="input-row" style="flex-direction: column; gap:6px;">
-                <input type="text" id="taskName" placeholder="任务名称">
-                <select id="taskProject"><option value="">无项目</option></select>
-                <select id="taskPerson" multiple size="2"><option value="">负责人</option></select>
-                <div style="display:flex; gap:6px;">
-                    <input type="date" id="taskStartDate">
-                    <input type="date" id="taskEndDate">
-                </div>
-                <select id="taskStatus"><option value="todo">未开始</option><option value="in-progress" selected>进行中</option><option value="done">已完成</option></select>
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <input type="range" id="taskProgress" min="0" max="100" value="0" oninput="progVal.textContent=this.value+'%'">
-                    <span id="progVal" style="font-size:0.75rem;">0%</span>
-                </div>
-                <button class="btn btn-primary btn-xs" onclick="addTask()">+ 添加任务</button>
-            </div>
-            <div class="task-list" id="tasksList"></div>
-        </div>
-    </aside>
+    </header>
 
-    <!-- 甘特图区域 -->
-    <div class="gantt-area">
-        <div class="gantt-toolbar">
-            <span id="ganttInfoText">📅 共 0 个任务</span>
-            <div class="granularity-bar" id="granularityBar">
-                <button class="granularity-btn active" data-gran="day">按天</button>
-                <button class="granularity-btn" data-gran="month">按月</button>
-                <button class="granularity-btn" data-gran="quarter">按季度</button>
-                <button class="granularity-btn" data-gran="year">按年</button>
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="section-title"><span class="dot search"></span> 查询过滤</div>
+                <input type="text" id="searchKeyword" placeholder="搜索任务/项目/人员..." oninput="applyFilter()" style="width:100%;">
             </div>
-        </div>
-        <div class="gantt-scroll" id="ganttScroll">
-            <div class="gantt-table" id="ganttTable"></div>
+            <div class="sidebar-section">
+                <div class="section-title"><span class="dot people"></span> 人员管理</div>
+                <div class="input-row">
+                    <input type="text" id="personName" placeholder="姓名" style="flex:2;">
+                    <input type="color" id="personColor" value="#3b82f6" style="width:40px; height:36px;">
+                    <button class="btn btn-primary btn-xs" onclick="addPerson()">+</button>
+                </div>
+                <ul id="peopleList" style="list-style:none; margin-top:8px; font-size:0.8rem;"></ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="section-title"><span class="dot project"></span> 项目</div>
+                <div class="input-row">
+                    <input type="text" id="projectName" placeholder="项目名称" style="flex:2;">
+                    <button class="btn btn-primary btn-xs" onclick="addProject()">+</button>
+                </div>
+                <ul id="projectsList" style="list-style:none; margin-top:8px; font-size:0.8rem;"></ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="section-title"><span class="dot task"></span> 新建任务</div>
+                <div class="input-row" style="flex-direction: column; gap:6px;">
+                    <input type="text" id="taskName" placeholder="任务名称">
+                    <select id="taskProject"><option value="">无项目</option></select>
+                    <select id="taskPerson" multiple size="2"><option value="">负责人</option></select>
+                    <div style="display:flex; gap:6px;">
+                        <input type="date" id="taskStartDate">
+                        <input type="date" id="taskEndDate">
+                    </div>
+                    <select id="taskStatus"><option value="todo">未开始</option><option value="in-progress" selected>进行中</option><option value="done">已完成</option></select>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="range" id="taskProgress" min="0" max="100" value="0" oninput="progVal.textContent=this.value+'%'">
+                        <span id="progVal" style="font-size:0.75rem;">0%</span>
+                    </div>
+                    <button class="btn btn-primary btn-xs" onclick="addTask()">+ 添加任务</button>
+                </div>
+                <div class="task-list" id="tasksList"></div>
+            </div>
+        </aside>
+
+        <div class="gantt-area">
+            <div class="gantt-toolbar">
+                <span id="ganttInfoText">📅 共 0 个任务</span>
+                <div class="granularity-bar" id="granularityBar">
+                    <button class="granularity-btn active" data-gran="day">按天</button>
+                    <button class="granularity-btn" data-gran="month">按月</button>
+                    <button class="granularity-btn" data-gran="quarter">按季度</button>
+                    <button class="granularity-btn" data-gran="year">按年</button>
+                </div>
+            </div>
+            <div class="gantt-scroll" id="ganttScroll">
+                <div class="gantt-table" id="ganttTable"></div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-(function() {
-    const STORE = 'pm_v8_ui';
-    let data = { people: [], projects: [], tasks: [] };
-    let filter = { kw: '' };
-    let gran = 'day';
-    let expanded = {}; // 甘特图展开状态
+// ========== 1. Supabase 配置（请替换成你自己的） ==========
+const SUPABASE_URL = 'https://bymeuixlakbqeapoztqg.supabase.co/rest/v1/';   // 替换为你的 Project URL
+const SUPABASE_ANON_KEY = 'sb_publishable_Sg8GBHs3aQS0CuY71EEqAA_R4GKThED';              // 替换为你的 anon public key
 
-    const UW = { day:28, month:56, quarter:80, year:100 };
-    const getUW = () => UW[gran] || 28;
+// 初始化 Supabase 客户端（只此一次）
+const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    function load() {
-        const raw = localStorage.getItem(STORE);
-        if (raw) try {
-            data = JSON.parse(raw);
-            data.tasks.forEach(t => {
-                if (!t.personIds) t.personIds = t.personId ? [t.personId] : [];
-                if (t.progress === undefined) t.progress = 0;
-                if (!t.subtasks) t.subtasks = [];
-                t.subtasks.forEach(s => { if (!s.personIds) s.personIds = []; });
-            });
-        } catch(e) { data = { people:[], projects:[], tasks:[] }; }
-        else data = { people:[], projects:[], tasks:[] };
+// ========== 2. 全局变量 ==========
+let currentUser = null;
+let data = { people: [], projects: [], tasks: [] };
+let filter = { kw: '' };
+let gran = 'day';
+let expanded = {};
+
+const UW = { day:28, month:56, quarter:80, year:100 };
+const getUW = () => UW[gran] || 28;
+
+// ========== 3. 云端数据同步函数 ==========
+async function loadUserDataFromCloud() {
+    if (!currentUser) return;
+    const { data: userData, error } = await supabase
+        .from('user_data')
+        .select('people, projects, tasks')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+    if (error && error.code !== 'PGRST116') {
+        console.error('加载数据失败', error);
+        alert('加载云端数据失败: ' + error.message);
+        return;
     }
-    function save() { localStorage.setItem(STORE, JSON.stringify(data)); }
-    window.manualSave = () => { save(); alert('已保存'); };
-
-    // 过滤
-    function applyFilter() { filter.kw = document.getElementById('searchKeyword').value.trim().toLowerCase(); renderAll(); }
-    function match(task, proj) {
-        if (!filter.kw) return true;
-        const k = filter.kw;
-        if (task.name.toLowerCase().includes(k)) return true;
-        if (proj && proj.name.toLowerCase().includes(k)) return true;
-        if (task.personIds) return task.personIds.some(id => {
-            const p = data.people.find(x => x.id === id);
-            return p && p.name.toLowerCase().includes(k);
+    if (userData) {
+        data.people = userData.people || [];
+        data.projects = userData.projects || [];
+        data.tasks = userData.tasks || [];
+        // 数据兼容处理
+        data.tasks.forEach(t => {
+            if (!t.personIds) t.personIds = [];
+            if (t.progress === undefined) t.progress = 0;
+            if (!t.subtasks) t.subtasks = [];
+            t.subtasks.forEach(s => { if (!s.personIds) s.personIds = []; });
         });
-        return false;
+    } else {
+        // 首次使用，初始化空数据
+        data = { people: [], projects: [], tasks: [] };
+        await saveUserDataToCloud();
     }
+    renderAll();
+}
 
-    // 人员/项目CRUD
-    window.addPerson = () => {
-        const n = document.getElementById('personName').value.trim();
-        if (!n) return;
-        data.people.push({ id: Date.now().toString(36), name: n, color: document.getElementById('personColor').value });
-        save(); renderAll();
-    };
-    window.deletePerson = (id) => {
-        if (!confirm('删除该人员？')) return;
-        data.tasks.forEach(t => t.personIds = t.personIds.filter(p => p !== id));
-        data.tasks.forEach(t => t.subtasks?.forEach(s => s.personIds = s.personIds.filter(p => p !== id)));
-        data.people = data.people.filter(p => p.id !== id);
-        save(); renderAll();
-    };
-    window.addProject = () => {
-        const n = document.getElementById('projectName').value.trim();
-        if (!n) return;
-        data.projects.push({ id: Date.now().toString(36), name: n });
-        save(); renderAll();
-    };
-    window.deleteProject = (id) => {
-        if (!confirm('删除项目及所有任务？')) return;
-        data.tasks = data.tasks.filter(t => t.projectId !== id);
-        data.projects = data.projects.filter(p => p.id !== id);
-        save(); renderAll();
-    };
+async function saveUserDataToCloud() {
+    if (!currentUser) return;
+    const { error } = await supabase
+        .from('user_data')
+        .upsert({
+            user_id: currentUser.id,
+            people: data.people,
+            projects: data.projects,
+            tasks: data.tasks,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+    if (error) {
+        console.error('保存到云端失败', error);
+        alert('保存失败: ' + error.message);
+    }
+}
 
-    // 任务CRUD
-    window.addTask = () => {
-        const name = document.getElementById('taskName').value.trim();
-        const projId = document.getElementById('taskProject').value || null;
-        const pids = Array.from(document.getElementById('taskPerson').selectedOptions).map(o => o.value).filter(v => v);
-        const start = document.getElementById('taskStartDate').value;
-        const end = document.getElementById('taskEndDate').value;
-        const status = document.getElementById('taskStatus').value;
-        const prog = parseInt(document.getElementById('taskProgress').value) || 0;
-        if (!name || !start || !end) return alert('请填写完整');
-        if (end < start) return alert('日期错误');
-        data.tasks.push({ id: Date.now().toString(36), projectId: projId, personIds: pids, name, startDate: start, endDate: end, status, progress: prog, subtasks: [] });
-        document.getElementById('taskName').value = '';
-        save(); renderAll();
-    };
-    window.deleteTask = (id) => { if (confirm('删除任务？')) { data.tasks = data.tasks.filter(t => t.id !== id); save(); renderAll(); } };
-    window.updateTaskStatus = (id, st) => {
-        const t = data.tasks.find(x => x.id === id);
-        if (t) { t.status = st; if (st === 'done') t.progress = 100; save(); renderAll(); }
-    };
+async function syncData() {
+    await saveUserDataToCloud();
+    // 无需再次 renderAll，调用方会刷新
+}
 
-    // 子任务操作（侧边栏内）
-    window.toggleExpand = (id) => { expanded[id] = !expanded[id]; renderAll(); };
-    window.toggleSubDone = (taskId, subId) => {
-        const t = data.tasks.find(x => x.id === taskId);
-        if (t) { const s = t.subtasks.find(x => x.id === subId); if (s) s.done = !s.done; save(); renderAll(); }
-    };
-    window.deleteSub = (taskId, subId) => {
-        const t = data.tasks.find(x => x.id === taskId);
-        if (t) { t.subtasks = t.subtasks.filter(s => s.id !== subId); save(); renderAll(); }
-    };
-    window.addSub = (taskId, nameInput, personSelect) => {
-        const name = nameInput.value.trim();
-        if (!name) return;
-        const t = data.tasks.find(x => x.id === taskId);
-        if (t) {
-            const pids = personSelect ? Array.from(personSelect.selectedOptions).map(o => o.value).filter(v => v) : [];
-            t.subtasks.push({ id: Date.now().toString(36), name, done: false, personIds: pids });
-            nameInput.value = '';
-            save(); renderAll();
+// ========== 4. 登录/注册/登出 ==========
+async function handleLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!email || !password) {
+        alert('请输入邮箱和密码');
+        return;
+    }
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+        alert('登录失败: ' + error.message);
+        return;
+    }
+    currentUser = authData.user;
+    await loadUserDataFromCloud();
+    showGanttApp();
+}
+
+async function handleSignup() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!email || !password) {
+        alert('请输入邮箱和密码');
+        return;
+    }
+    const { data: authData, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+        alert('注册失败: ' + error.message);
+        return;
+    }
+    if (authData.user) {
+        alert('注册成功！请登录。');
+        document.getElementById('loginPassword').value = '';
+    } else {
+        alert('注册成功，请检查邮箱验证（如果要求验证）后登录。');
+    }
+}
+
+async function handleLogout() {
+    await supabase.auth.signOut();
+    currentUser = null;
+    showLoginPanel();
+}
+
+function showGanttApp() {
+    document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('ganttApp').style.display = 'block';
+    document.getElementById('userEmailSpan').innerText = currentUser.email;
+}
+
+function showLoginPanel() {
+    document.getElementById('loginPanel').style.display = 'flex';
+    document.getElementById('ganttApp').style.display = 'none';
+}
+
+// ========== 5. 原有数据操作（全部改为 async + syncData）==========
+window.manualSave = async () => {
+    await saveUserDataToCloud();
+    alert('✅ 数据已保存到云端');
+};
+
+window.addPerson = async () => {
+    const n = document.getElementById('personName').value.trim();
+    if (!n) return;
+    data.people.push({ id: Date.now().toString(36), name: n, color: document.getElementById('personColor').value });
+    document.getElementById('personName').value = '';
+    await syncData();
+    renderAll();
+};
+
+window.deletePerson = async (id) => {
+    if (!confirm('删除该人员？')) return;
+    data.tasks.forEach(t => t.personIds = t.personIds.filter(p => p !== id));
+    data.tasks.forEach(t => t.subtasks?.forEach(s => s.personIds = s.personIds.filter(p => p !== id)));
+    data.people = data.people.filter(p => p.id !== id);
+    await syncData();
+    renderAll();
+};
+
+window.addProject = async () => {
+    const n = document.getElementById('projectName').value.trim();
+    if (!n) return;
+    data.projects.push({ id: Date.now().toString(36), name: n });
+    document.getElementById('projectName').value = '';
+    await syncData();
+    renderAll();
+};
+
+window.deleteProject = async (id) => {
+    if (!confirm('删除项目及所有任务？')) return;
+    data.tasks = data.tasks.filter(t => t.projectId !== id);
+    data.projects = data.projects.filter(p => p.id !== id);
+    await syncData();
+    renderAll();
+};
+
+window.addTask = async () => {
+    const name = document.getElementById('taskName').value.trim();
+    const projId = document.getElementById('taskProject').value || null;
+    const pids = Array.from(document.getElementById('taskPerson').selectedOptions).map(o => o.value).filter(v => v);
+    const start = document.getElementById('taskStartDate').value;
+    const end = document.getElementById('taskEndDate').value;
+    const status = document.getElementById('taskStatus').value;
+    const prog = parseInt(document.getElementById('taskProgress').value) || 0;
+    if (!name || !start || !end) return alert('请填写完整');
+    if (end < start) return alert('结束日期不能早于开始日期');
+    data.tasks.push({ id: Date.now().toString(36), projectId: projId, personIds: pids, name, startDate: start, endDate: end, status, progress: prog, subtasks: [] });
+    document.getElementById('taskName').value = '';
+    await syncData();
+    renderAll();
+};
+
+window.deleteTask = async (id) => {
+    if (confirm('删除任务？')) {
+        data.tasks = data.tasks.filter(t => t.id !== id);
+        await syncData();
+        renderAll();
+    }
+};
+
+window.updateTaskStatus = async (id, st) => {
+    const t = data.tasks.find(x => x.id === id);
+    if (t) {
+        t.status = st;
+        if (st === 'done') t.progress = 100;
+        await syncData();
+        renderAll();
+    }
+};
+
+// 子任务操作
+window.toggleExpand = (id) => { expanded[id] = !expanded[id]; renderAll(); };
+window.toggleSubDone = async (taskId, subId) => {
+    const t = data.tasks.find(x => x.id === taskId);
+    if (t) {
+        const s = t.subtasks.find(x => x.id === subId);
+        if (s) s.done = !s.done;
+        await syncData();
+        renderAll();
+    }
+};
+window.deleteSub = async (taskId, subId) => {
+    const t = data.tasks.find(x => x.id === taskId);
+    if (t) {
+        t.subtasks = t.subtasks.filter(s => s.id !== subId);
+        await syncData();
+        renderAll();
+    }
+};
+window.addSub = async (taskId, nameInput, personSelect) => {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const t = data.tasks.find(x => x.id === taskId);
+    if (t) {
+        const pids = personSelect ? Array.from(personSelect.selectedOptions).map(o => o.value).filter(v => v) : [];
+        t.subtasks.push({ id: Date.now().toString(36), name, done: false, personIds: pids });
+        nameInput.value = '';
+        await syncData();
+        renderAll();
+    }
+};
+
+// 示例数据加载（覆盖云端）
+window.loadDemoData = async () => {
+    if (data.tasks.length || data.projects.length || data.people.length) {
+        if (!confirm('加载示例数据将覆盖当前数据，确定吗？')) return;
+    }
+    const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+    const d = day => new Date(y, m, day).toISOString().slice(0,10);
+    data.people = [
+        {id:'p1', name:'张伟', color:'#3b82f6'}, {id:'p2', name:'李娜', color:'#8b5cf6'},
+        {id:'p3', name:'王磊', color:'#f59e0b'}
+    ];
+    data.projects = [{id:'pr1', name:'产品发布'}];
+    data.tasks = [
+        {id:'t1', projectId:'pr1', personIds:['p1','p2'], name:'需求分析', startDate:d(now.getDate()-5), endDate:d(now.getDate()+2), status:'done', progress:100,
+            subtasks:[
+                {id:'s1', name:'用户访谈', done:true, personIds:['p1']},
+                {id:'s2', name:'竞品报告', done:true, personIds:['p2']}
+            ]},
+        {id:'t2', projectId:'pr1', personIds:['p3'], name:'界面设计', startDate:d(now.getDate()+1), endDate:d(now.getDate()+6), status:'in-progress', progress:40,
+            subtasks:[
+                {id:'s3', name:'首页设计', done:false, personIds:['p3']}
+            ]}
+    ];
+    await syncData();
+    renderAll();
+    alert('✅ 示例数据已加载并同步到云端');
+};
+
+// 导出 / 导入 / 清空
+window.exportData = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '甘特图数据.json'; a.click();
+};
+window.importData = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async ev => {
+        try {
+            const imp = JSON.parse(ev.target.result);
+            if (!imp.people || !imp.projects || !imp.tasks) throw new Error('数据格式不完整');
+            data = imp;
+            data.tasks.forEach(t => { if (!t.subtasks) t.subtasks = []; t.subtasks.forEach(s => { if(!s.personIds) s.personIds = []; }); });
+            await syncData();
+            renderAll();
+            alert('✅ 数据导入成功并已保存到云端');
+        } catch(ex) {
+            alert('❌ 文件格式不正确');
         }
     };
+    reader.readAsText(file);
+    e.target.value = '';
+};
+window.clearAllData = async () => {
+    if (confirm('⚠️ 确定要清空所有数据吗？此操作不可恢复！')) {
+        data = { people: [], projects: [], tasks: [] };
+        await syncData();
+        renderAll();
+        alert('🗑 数据已清空');
+    }
+};
 
-    // 渲染侧边栏列表
-    function renderSidebar() {
-        document.getElementById('peopleList').innerHTML = data.people.map(p => `<li style="display:flex; justify-content:space-between; align-items:center;"> <span><span class="person-dot" style="background:${p.color}; width:8px; height:8px; border-radius:50%; display:inline-block;"></span> ${p.name}</span> <button class="btn btn-danger btn-xs" onclick="deletePerson('${p.id}')">×</button></li>`).join('');
-        document.getElementById('projectsList').innerHTML = data.projects.map(p => `<li style="display:flex; justify-content:space-between;"> ${p.name} <button class="btn btn-danger btn-xs" onclick="deleteProject('${p.id}')">×</button></li>`).join('');
-        // 任务列表卡片
-        const list = document.getElementById('tasksList');
-        list.innerHTML = data.tasks.map(t => {
-            const proj = data.projects.find(p => p.id === t.projectId);
-            const persons = t.personIds.map(id => data.people.find(p => p.id === id)).filter(Boolean);
-            const progress = t.progress || 0;
-            const done = t.status === 'done' || progress === 100;
+// ========== 6. UI 渲染（完整保留你原来的渲染逻辑）==========
+function renderSidebar() {
+    document.getElementById('peopleList').innerHTML = data.people.map(p => `<li style="display:flex; justify-content:space-between; align-items:center;"> <span><span class="person-dot" style="background:${p.color}; width:8px; height:8px; border-radius:50%; display:inline-block;"></span> ${p.name}</span> <button class="btn btn-danger btn-xs" onclick="deletePerson('${p.id}')">×</button></li>`).join('');
+    document.getElementById('projectsList').innerHTML = data.projects.map(p => `<li style="display:flex; justify-content:space-between;"> ${p.name} <button class="btn btn-danger btn-xs" onclick="deleteProject('${p.id}')">×</button></li>`).join('');
+
+    const list = document.getElementById('tasksList');
+    list.innerHTML = data.tasks.map(t => {
+        const proj = data.projects.find(p => p.id === t.projectId);
+        const persons = t.personIds.map(id => data.people.find(p => p.id === id)).filter(Boolean);
+        const progress = t.progress || 0;
+        const isExpanded = expanded[t.id] || false;
+        const subCount = t.subtasks?.length || 0;
+        const completedSubs = t.subtasks?.filter(s => s.done).length || 0;
+        let statusClass = t.status === 'done' ? 'status-done' : (t.status === 'in-progress' ? 'status-progress' : 'status-todo');
+        return `<div class="task-card">
+            <div class="task-header" onclick="toggleExpand('${t.id}')">
+                <span class="task-expand ${isExpanded?'open':''}">▶</span>
+                <div class="task-info">
+                    <div class="task-name">${t.name}</div>
+                    <div class="task-meta">
+                        <span>${proj ? proj.name : '无项目'}</span>
+                        <span class="status-badge ${statusClass}">${t.status==='done'?'完成':(t.status==='in-progress'?'进行中':'未开始')}</span>
+                        ${subCount > 0 ? `<span>📋 ${completedSubs}/${subCount}</span>` : ''}
+                    </div>
+                </div>
+                <span style="font-size:0.8rem;">${progress}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${progress}%;"></div></div>
+            <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+                ${persons.map(p => `<span class="person-tag"><span class="person-dot" style="background:${p.color};"></span>${p.name}</span>`).join('')}
+            </div>
+            <div class="subtask-list" style="display:${isExpanded?'block':'none'};">
+                ${t.subtasks?.map(sub => {
+                    const subPersons = (sub.personIds || []).map(id => data.people.find(p => p.id === id)).filter(Boolean);
+                    return `<div class="subtask-item">
+                        <input type="checkbox" ${sub.done?'checked':''} onchange="toggleSubDone('${t.id}','${sub.id}')">
+                        <span style="${sub.done?'text-decoration:line-through;color:#999':''}">${sub.name}</span>
+                        <span style="font-size:0.6rem;">${subPersons.map(p => p.name).join(',')}</span>
+                        <button class="btn btn-danger btn-xs" onclick="deleteSub('${t.id}','${sub.id}')">×</button>
+                    </div>`;
+                }).join('')}
+                <div class="subtask-add">
+                    <input type="text" id="subName_${t.id}" placeholder="子任务名称" style="width:100px;">
+                    <select id="subPerson_${t.id}" multiple size="1" style="width:80px; font-size:0.7rem;">
+                        ${data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                    </select>
+                    <button class="btn btn-primary btn-xs" onclick="addSub('${t.id}', document.getElementById('subName_${t.id}'), document.getElementById('subPerson_${t.id}'))">+</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function applyFilter() { filter.kw = document.getElementById('searchKeyword').value.trim().toLowerCase(); renderGantt(); }
+function match(task, proj) {
+    if (!filter.kw) return true;
+    const k = filter.kw;
+    if (task.name.toLowerCase().includes(k)) return true;
+    if (proj && proj.name.toLowerCase().includes(k)) return true;
+    if (task.personIds) return task.personIds.some(id => {
+        const p = data.people.find(x => x.id === id);
+        return p && p.name.toLowerCase().includes(k);
+    });
+    return false;
+}
+
+function renderGantt() {
+    const filtered = data.tasks.filter(t => match(t, data.projects.find(p => p.id === t.projectId)));
+    document.getElementById('ganttInfoText').textContent = `📅 共 ${filtered.length} 个任务`;
+    const table = document.getElementById('ganttTable');
+    if (!filtered.length) { table.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-light);">暂无任务，请添加</div>'; return; }
+
+    const { start, end } = getRange();
+    const units = genUnits(start, end);
+    const uw = getUW();
+    const todayLine = getTodayLine(units, uw);
+
+    const groups = []; const map = {};
+    data.projects.forEach(p => map[p.id] = { project:p, tasks:[] });
+    filtered.forEach(t => {
+        if (t.projectId && map[t.projectId]) map[t.projectId].tasks.push(t);
+        else { if (!groups[0] || groups[0].project) groups.unshift({ project:null, tasks:[] }); groups[0].tasks.push(t); }
+    });
+    data.projects.forEach(p => { if (map[p.id].tasks.length) groups.push(map[p.id]); });
+
+    let html = `<div class="gantt-header-row"><div class="gantt-left">任务 / 项目</div><div class="gantt-right"><div class="gantt-lower-row">`;
+    units.forEach(u => html += `<div class="gantt-unit${u.weekend?' weekend':''}" style="width:${uw}px">${u.label}</div>`);
+    html += '</div></div></div><div class="gantt-body">';
+
+    groups.forEach(g => {
+        html += `<div class="gantt-row project-group"><div class="gantt-row-left">📌 ${g.project?.name || '未分类'} (${g.tasks.length})</div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}${todayLine>=0?`<div class="today-line" style="left:${todayLine}px"></div>`:''}</div></div>`;
+        g.tasks.forEach(t => {
+            const color = getTaskColor(t);
+            const pos = getBarPos(t, units, uw);
             const isExpanded = expanded[t.id] || false;
-            const subCount = t.subtasks?.length || 0;
-            const completedSubs = t.subtasks?.filter(s => s.done).length || 0;
-            let statusClass = t.status === 'done' ? 'status-done' : (t.status === 'in-progress' ? 'status-progress' : 'status-todo');
-            return `<div class="task-card">
-                <div class="task-header" onclick="toggleExpand('${t.id}')">
-                    <span class="task-expand ${isExpanded?'open':''}">▶</span>
-                    <div class="task-info">
-                        <div class="task-name">${t.name}</div>
-                        <div class="task-meta">
-                            <span>${proj ? proj.name : '无项目'}</span>
-                            <span class="status-badge ${statusClass}">${t.status==='done'?'完成':(t.status==='in-progress'?'进行中':'未开始')}</span>
-                            ${subCount > 0 ? `<span>📋 ${completedSubs}/${subCount}</span>` : ''}
-                        </div>
-                    </div>
-                    <span style="font-size:0.8rem;">${progress}%</span>
-                </div>
-                <div class="progress-bar"><div class="progress-fill" style="width:${progress}%;"></div></div>
-                <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-                    ${persons.map(p => `<span class="person-tag"><span class="person-dot" style="background:${p.color};"></span>${p.name}</span>`).join('')}
-                </div>
-                <div class="subtask-list" style="display:${isExpanded?'block':'none'};">
-                    ${t.subtasks?.map(sub => {
-                        const subPersons = (sub.personIds || []).map(id => data.people.find(p => p.id === id)).filter(Boolean);
-                        return `<div class="subtask-item">
-                            <input type="checkbox" ${sub.done?'checked':''} onchange="toggleSubDone('${t.id}','${sub.id}')">
-                            <span style="${sub.done?'text-decoration:line-through;color:#999':''}">${sub.name}</span>
-                            <span style="font-size:0.6rem;">${subPersons.map(p => p.name).join(',')}</span>
-                            <button class="btn btn-danger btn-xs" onclick="deleteSub('${t.id}','${sub.id}')">×</button>
-                        </div>`;
-                    }).join('')}
-                    <div class="subtask-add">
-                        <input type="text" id="subName_${t.id}" placeholder="子任务名称" style="width:100px;">
-                        <select id="subPerson_${t.id}" multiple size="1" style="width:80px; font-size:0.7rem;">
-                            ${data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-                        </select>
-                        <button class="btn btn-primary btn-xs" onclick="addSub('${t.id}', document.getElementById('subName_${t.id}'), document.getElementById('subPerson_${t.id}'))">+</button>
-                    </div>
-                </div>
-            </div>`;
-        }).join('');
-    }
+            const progress = t.progress || 0;
+            const hasSubs = t.subtasks?.length > 0;
+            html += `<div class="gantt-row"><div class="gantt-row-left">
+                <span class="task-expand ${isExpanded?'open':''}" onclick="toggleExpand('${t.id}')">${hasSubs?'▶':'•'}</span>
+                <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">${t.name}</span>
+                <div class="progress-bar" style="width:50px; margin:0;"><div class="progress-fill" style="width:${progress}%;"></div></div>
+                <span style="font-size:0.65rem; margin-left:4px;">${progress}%</span>
+            </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}`;
+            if (pos) {
+                const left = Math.max(0, pos.left), width = Math.min(pos.width, units.length*uw - left);
+                const doneClass = (t.status === 'done' || progress === 100) ? ' task-done' : '';
+                html += `<div class="gantt-bar${doneClass}" style="left:${left}px; width:${width}px; background:${color};">
+                    <div class="progress-overlay" style="width:${progress}%;"></div><span>${t.name}</span></div>`;
+            }
+            if (todayLine>=0) html += `<div class="today-line" style="left:${todayLine}px"></div>`;
+            html += `</div></div>`;
 
-    // 甘特图渲染
-    function renderGantt() {
-        const filtered = data.tasks.filter(t => match(t, data.projects.find(p => p.id === t.projectId)));
-        document.getElementById('ganttInfoText').textContent = `📅 共 ${filtered.length} 个任务`;
-        const table = document.getElementById('ganttTable');
-        if (!filtered.length) { table.innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-light);">暂无任务，请添加</div>'; return; }
-
-        const { start, end } = getRange();
-        const units = genUnits(start, end);
-        const uw = getUW();
-        const upper = genUpper(units);
-        const todayLine = getTodayLine(units, uw);
-
-        const groups = []; const map = {};
-        data.projects.forEach(p => map[p.id] = { project:p, tasks:[] });
-        filtered.forEach(t => {
-            if (t.projectId && map[t.projectId]) map[t.projectId].tasks.push(t);
-            else { if (!groups[0] || groups[0].project) groups.unshift({ project:null, tasks:[] }); groups[0].tasks.push(t); }
-        });
-        data.projects.forEach(p => { if (map[p.id].tasks.length) groups.push(map[p.id]); });
-
-        let html = `<div class="gantt-header-row"><div class="gantt-left">任务 / 项目</div><div class="gantt-right">`;
-        if (upper.length) { html += '<div class="gantt-upper-row">'; upper.forEach(u => html += `<div class="gantt-upper-label" style="width:${u.width}px">${u.label}</div>`); html += '</div>'; }
-        html += '<div class="gantt-lower-row">';
-        units.forEach(u => html += `<div class="gantt-unit${u.weekend?' weekend':''}" style="width:${uw}px">${u.label}</div>`);
-        html += '</div></div></div><div class="gantt-body">';
-
-        groups.forEach(g => {
-            html += `<div class="gantt-row project-group"><div class="gantt-row-left">📌 ${g.project?.name || '未分类'} (${g.tasks.length})</div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}${todayLine>=0?`<div class="today-line" style="left:${todayLine}px"></div>`:''}</div></div>`;
-            g.tasks.forEach(t => {
-                const color = getTaskColor(t);
-                const pos = getBarPos(t, units, uw);
-                const isExpanded = expanded[t.id] || false;
-                const progress = t.progress || 0;
-                const hasSubs = t.subtasks?.length > 0;
-                html += `<div class="gantt-row"><div class="gantt-row-left">
-                    <span class="task-expand ${isExpanded?'open':''}" onclick="toggleExpand('${t.id}')">${hasSubs?'▶':'•'}</span>
-                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis;">${t.name}</span>
-                    <div class="progress-bar" style="width:50px; margin:0;"><div class="progress-fill" style="width:${progress}%;"></div></div>
-                    <span style="font-size:0.65rem; margin-left:4px;">${progress}%</span>
-                </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}`;
-                if (pos) {
-                    const left = Math.max(0, pos.left), width = Math.min(pos.width, units.length*uw - left);
-                    const doneClass = (t.status === 'done' || progress === 100) ? ' task-done' : '';
-                    html += `<div class="gantt-bar${doneClass}" style="left:${left}px; width:${width}px; background:${color};">
-                        <div class="progress-overlay" style="width:${progress}%;"></div><span>${t.name}</span></div>`;
-                }
-                if (todayLine>=0) html += `<div class="today-line" style="left:${todayLine}px"></div>`;
-                html += `</div></div>`;
-
-                // 子任务行
-                if (isExpanded && hasSubs) {
-                    t.subtasks.forEach(sub => {
-                        const subPersons = (sub.personIds || []).map(id => data.people.find(p => p.id === id)).filter(Boolean);
-                        html += `<div class="gantt-row subtask-row"><div class="gantt-row-left" style="padding-left:30px; font-size:0.75rem;">
-                            <input type="checkbox" ${sub.done?'checked':''} onchange="toggleSubDone('${t.id}','${sub.id}')" style="width:14px; height:14px;">
-                            <span style="${sub.done?'text-decoration:line-through; color:#999':''}">${sub.name}</span>
-                            <span style="font-size:0.6rem;">${subPersons.map(p => p.name).join(',')}</span>
-                            <button class="btn btn-danger btn-xs" style="margin-left:auto;" onclick="deleteSub('${t.id}','${sub.id}')">×</button>
-                        </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg" style="width:${uw}px"></div>`).join('')}</div></div>`;
-                    });
-                    // 添加子任务行
-                    html += `<div class="gantt-row subtask-row"><div class="gantt-row-left" style="padding-left:30px; display:flex; gap:4px; align-items:center;">
-                        <input type="text" id="ganttSubName_${t.id}" placeholder="子任务" style="width:80px; font-size:0.7rem;">
-                        <select id="ganttSubPerson_${t.id}" multiple size="1" style="width:70px; font-size:0.65rem;">
-                            ${data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-                        </select>
-                        <button class="btn btn-primary btn-xs" onclick="addSub('${t.id}', document.getElementById('ganttSubName_${t.id}'), document.getElementById('ganttSubPerson_${t.id}'))">+</button>
+            if (isExpanded && hasSubs) {
+                t.subtasks.forEach(sub => {
+                    const subPersons = (sub.personIds || []).map(id => data.people.find(p => p.id === id)).filter(Boolean);
+                    html += `<div class="gantt-row subtask-row"><div class="gantt-row-left" style="padding-left:30px; font-size:0.75rem;">
+                        <input type="checkbox" ${sub.done?'checked':''} onchange="toggleSubDone('${t.id}','${sub.id}')" style="width:14px; height:14px;">
+                        <span style="${sub.done?'text-decoration:line-through; color:#999':''}">${sub.name}</span>
+                        <span style="font-size:0.6rem;">${subPersons.map(p => p.name).join(',')}</span>
+                        <button class="btn btn-danger btn-xs" style="margin-left:auto;" onclick="deleteSub('${t.id}','${sub.id}')">×</button>
                     </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg" style="width:${uw}px"></div>`).join('')}</div></div>`;
-                }
-            });
+                });
+                html += `<div class="gantt-row subtask-row"><div class="gantt-row-left" style="padding-left:30px; display:flex; gap:4px; align-items:center;">
+                    <input type="text" id="ganttSubName_${t.id}" placeholder="子任务" style="width:80px; font-size:0.7rem;">
+                    <select id="ganttSubPerson_${t.id}" multiple size="1" style="width:70px; font-size:0.65rem;">
+                        ${data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                    </select>
+                    <button class="btn btn-primary btn-xs" onclick="addSub('${t.id}', document.getElementById('ganttSubName_${t.id}'), document.getElementById('ganttSubPerson_${t.id}'))">+</button>
+                </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg" style="width:${uw}px"></div>`).join('')}</div></div>`;
+            }
         });
-        html += '</div>';
-        table.innerHTML = html;
-    }
+    });
+    html += '</div>';
+    table.innerHTML = html;
+}
 
-    function getTaskColor(task) {
-        if (task.status === 'done' || task.progress === 100) return '#10b981'; // 完成绿色
-        const firstPerson = data.people.find(p => p.id === task.personIds?.[0]);
-        return firstPerson?.color || '#8899aa';
-    }
+function getTaskColor(task) {
+    if (task.status === 'done' || task.progress === 100) return '#10b981';
+    const firstPerson = data.people.find(p => p.id === task.personIds?.[0]);
+    return firstPerson?.color || '#8899aa';
+}
 
-    function renderAll() {
-        // 刷新下拉框
-        const projSel = document.getElementById('taskProject');
-        projSel.innerHTML = '<option value="">无项目</option>' + data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-        const personSel = document.getElementById('taskPerson');
-        personSel.innerHTML = data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-        renderSidebar();
+function renderAll() {
+    const projSel = document.getElementById('taskProject');
+    projSel.innerHTML = '<option value="">无项目</option>' + data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    const personSel = document.getElementById('taskPerson');
+    personSel.innerHTML = data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    renderSidebar();
+    renderGantt();
+}
+
+// ========== 7. 甘特图辅助函数（原样保留） ==========
+function daysBetween(d1,d2) { return Math.round((d2-d1)/86400000); }
+function quarterStart(d) { return new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3, 1); }
+function quarterEnd(d) { return new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3+3, 0); }
+function isToday(d) { const t=new Date(); return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate(); }
+
+function getRange() {
+    if (!data.tasks.length) { const n=new Date(); return { start: new Date(n.getFullYear(), n.getMonth(), 1), end: new Date(n.getFullYear(), n.getMonth()+1, 0) }; }
+    let min=null, max=null;
+    data.tasks.forEach(t => { const s=new Date(t.startDate+'T00:00:00'), e=new Date(t.endDate+'T00:00:00'); if(!min||s<min) min=s; if(!max||e>max) max=e; });
+    const ps=new Date(min), pe=new Date(max);
+    if (gran==='day') { ps.setDate(ps.getDate()-3); pe.setDate(pe.getDate()+3); }
+    else if (gran==='month') { ps.setDate(1); ps.setMonth(ps.getMonth()-1); pe.setMonth(pe.getMonth()+2); pe.setDate(0); }
+    else if (gran==='quarter') { ps.setMonth(Math.floor(ps.getMonth()/3)*3-3); pe.setMonth(Math.floor(pe.getMonth()/3)*3+6); pe.setDate(0); }
+    else if (gran==='year') { ps.setFullYear(ps.getFullYear()-1); ps.setMonth(0); ps.setDate(1); pe.setFullYear(pe.getFullYear()+1); pe.setMonth(11); pe.setDate(31); }
+    return { start: ps, end: pe };
+}
+function genUnits(start, end) {
+    const arr=[], uw=getUW();
+    if (gran==='day') for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) arr.push({ label:d.getDate(), date:new Date(d), w:uw, weekend:d.getDay()===0||d.getDay()===6, today:isToday(d) });
+    else if (gran==='month') { let d=new Date(start.getFullYear(),start.getMonth(),1); while(d<=end){ arr.push({ label:(d.getMonth()+1)+'月', date:new Date(d), w:uw, today:isToday(d) }); d.setMonth(d.getMonth()+1); } }
+    else if (gran==='quarter') { let d=new Date(start.getFullYear(), Math.floor(start.getMonth()/3)*3,1); while(d<=end){ arr.push({ label:'Q'+(Math.floor(d.getMonth()/3)+1), date:new Date(d), w:uw }); d.setMonth(d.getMonth()+3); } }
+    else for (let y=start.getFullYear(); y<=end.getFullYear(); y++) arr.push({ label:y, date:new Date(y,0,1), w:uw });
+    return arr;
+}
+function getBarPos(task, units, uw) {
+    const ts=new Date(task.startDate+'T00:00:00'), te=new Date(task.endDate+'T00:00:00');
+    let si=-1, ei=-1;
+    for (let i=0;i<units.length;i++) {
+        const u=units[i]; let us,ue;
+        if (gran==='day') { us=new Date(u.date); us.setHours(0,0,0,0); ue=new Date(u.date); ue.setHours(23,59,59,999); }
+        else if (gran==='month') { us=new Date(u.date.getFullYear(), u.date.getMonth(),1); ue=new Date(u.date.getFullYear(), u.date.getMonth()+1,0); ue.setHours(23,59,59,999); }
+        else if (gran==='quarter') { us=quarterStart(u.date); ue=quarterEnd(u.date); ue.setHours(23,59,59,999); }
+        else { us=new Date(u.date.getFullYear(),0,1); ue=new Date(u.date.getFullYear(),11,31); ue.setHours(23,59,59,999); }
+        if (ts<=ue && te>=us) { if(si===-1) si=i; ei=i; }
+    }
+    if(si===-1) return null;
+    return { left: si*uw, width: Math.max((ei-si+1)*uw, 6) };
+}
+function getTodayLine(units, uw) {
+    const today=new Date(); today.setHours(12,0,0,0);
+    for (let i=0;i<units.length;i++) {
+        const u=units[i]; let us,ue;
+        if (gran==='day') { us=new Date(u.date); us.setHours(0,0,0,0); ue=new Date(u.date); ue.setHours(23,59,59,999); }
+        else if (gran==='month') { us=new Date(u.date.getFullYear(), u.date.getMonth(),1); ue=new Date(u.date.getFullYear(), u.date.getMonth()+1,0); ue.setHours(23,59,59,999); }
+        else if (gran==='quarter') { us=quarterStart(u.date); ue=quarterEnd(u.date); ue.setHours(23,59,59,999); }
+        else { us=new Date(u.date.getFullYear(),0,1); ue=new Date(u.date.getFullYear(),11,31); ue.setHours(23,59,59,999); }
+        if (today>=us && today<=ue) {
+            const total = ue - us, elapsed = today - us;
+            return i*uw + (total>0 ? (elapsed/total)*uw : uw/2);
+        }
+    }
+    return -1;
+}
+
+// ========== 8. 粒度切换 ==========
+document.getElementById('granularityBar').addEventListener('click', e => {
+    const btn = e.target.closest('.granularity-btn');
+    if (btn) {
+        gran = btn.dataset.gran;
+        document.querySelectorAll('.granularity-btn').forEach(b => b.classList.toggle('active', b.dataset.gran === gran));
         renderGantt();
     }
+});
 
-    // 甘特图工具函数
-    function daysBetween(d1,d2) { return Math.round((d2-d1)/86400000); }
-    function quarterStart(d) { return new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3, 1); }
-    function quarterEnd(d) { return new Date(d.getFullYear(), Math.floor(d.getMonth()/3)*3+3, 0); }
-    function isToday(d) { const t=new Date(); return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate(); }
+// ========== 9. 初始化：检查会话，绑定事件 ==========
+document.getElementById('btnLogin').addEventListener('click', handleLogin);
+document.getElementById('btnSignup').addEventListener('click', handleSignup);
+document.getElementById('btnLogout').addEventListener('click', handleLogout);
 
-    function getRange() {
-        if (!data.tasks.length) { const n=new Date(); return { start: new Date(n.getFullYear(), n.getMonth(), 1), end: new Date(n.getFullYear(), n.getMonth()+1, 0) }; }
-        let min=null, max=null;
-        data.tasks.forEach(t => { const s=new Date(t.startDate+'T00:00:00'), e=new Date(t.endDate+'T00:00:00'); if(!min||s<min) min=s; if(!max||e>max) max=e; });
-        const ps=new Date(min), pe=new Date(max);
-        if (gran==='day') { ps.setDate(ps.getDate()-3); pe.setDate(pe.getDate()+3); }
-        else if (gran==='month') { ps.setDate(1); ps.setMonth(ps.getMonth()-1); pe.setMonth(pe.getMonth()+2); pe.setDate(0); }
-        else if (gran==='quarter') { ps.setMonth(Math.floor(ps.getMonth()/3)*3-3); pe.setMonth(Math.floor(pe.getMonth()/3)*3+6); pe.setDate(0); }
-        else if (gran==='year') { ps.setFullYear(ps.getFullYear()-1); ps.setMonth(0); ps.setDate(1); pe.setFullYear(pe.getFullYear()+1); pe.setMonth(11); pe.setDate(31); }
-        return { start: ps, end: pe };
+(async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        await loadUserDataFromCloud();
+        showGanttApp();
+    } else {
+        showLoginPanel();
     }
-    function genUnits(start, end) {
-        const arr=[], uw=getUW();
-        if (gran==='day') for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) arr.push({ label:d.getDate(), date:new Date(d), w:uw, weekend:d.getDay()===0||d.getDay()===6, today:isToday(d) });
-        else if (gran==='month') { let d=new Date(start.getFullYear(),start.getMonth(),1); while(d<=end){ arr.push({ label:(d.getMonth()+1)+'月', date:new Date(d), w:uw, today:isToday(d) }); d.setMonth(d.getMonth()+1); } }
-        else if (gran==='quarter') { let d=new Date(start.getFullYear(), Math.floor(start.getMonth()/3)*3,1); while(d<=end){ arr.push({ label:'Q'+(Math.floor(d.getMonth()/3)+1), date:new Date(d), w:uw }); d.setMonth(d.getMonth()+3); } }
-        else for (let y=start.getFullYear(); y<=end.getFullYear(); y++) arr.push({ label:y, date:new Date(y,0,1), w:uw });
-        return arr;
-    }
-    function genUpper(units) { /* 省略，同前逻辑，简化 */ return []; }
-    function getBarPos(task, units, uw) {
-        const ts=new Date(task.startDate+'T00:00:00'), te=new Date(task.endDate+'T00:00:00');
-        let si=-1, ei=-1;
-        for (let i=0;i<units.length;i++) {
-            const u=units[i]; let us,ue;
-            if (gran==='day') { us=new Date(u.date); us.setHours(0,0,0,0); ue=new Date(u.date); ue.setHours(23,59,59,999); }
-            else if (gran==='month') { us=new Date(u.date.getFullYear(), u.date.getMonth(),1); ue=new Date(u.date.getFullYear(), u.date.getMonth()+1,0); ue.setHours(23,59,59,999); }
-            else if (gran==='quarter') { us=quarterStart(u.date); ue=quarterEnd(u.date); ue.setHours(23,59,59,999); }
-            else { us=new Date(u.date.getFullYear(),0,1); ue=new Date(u.date.getFullYear(),11,31); ue.setHours(23,59,59,999); }
-            if (ts<=ue && te>=us) { if(si===-1) si=i; ei=i; }
-        }
-        if(si===-1) return null;
-        return { left: si*uw, width: Math.max((ei-si+1)*uw, 6) };
-    }
-    function getTodayLine(units, uw) {
-        const today=new Date(); today.setHours(12,0,0,0);
-        for (let i=0;i<units.length;i++) {
-            const u=units[i]; let us,ue;
-            if (gran==='day') { us=new Date(u.date); us.setHours(0,0,0,0); ue=new Date(u.date); ue.setHours(23,59,59,999); }
-            else if (gran==='month') { us=new Date(u.date.getFullYear(), u.date.getMonth(),1); ue=new Date(u.date.getFullYear(), u.date.getMonth()+1,0); ue.setHours(23,59,59,999); }
-            else if (gran==='quarter') { us=quarterStart(u.date); ue=quarterEnd(u.date); ue.setHours(23,59,59,999); }
-            else { us=new Date(u.date.getFullYear(),0,1); ue=new Date(u.date.getFullYear(),11,31); ue.setHours(23,59,59,999); }
-            if (today>=us && today<=ue) {
-                const total = ue - us, elapsed = today - us;
-                return i*uw + (total>0 ? (elapsed/total)*uw : uw/2);
-            }
-        }
-        return -1;
-    }
-
-    // 粒度切换
-    document.getElementById('granularityBar').addEventListener('click', e => {
-        const btn = e.target.closest('.granularity-btn');
-        if (btn) {
-            gran = btn.dataset.gran;
-            document.querySelectorAll('.granularity-btn').forEach(b => b.classList.toggle('active', b.dataset.gran === gran));
-            renderGantt();
-        }
-    });
-
-    window.loadDemoData = () => {
-        if (data.tasks.length && !confirm('覆盖现有数据？')) return;
-        const now = new Date(), y = now.getFullYear(), m = now.getMonth();
-        const d = day => new Date(y, m, day).toISOString().slice(0,10);
-        data.people = [
-            {id:'p1', name:'张伟', color:'#3b82f6'}, {id:'p2', name:'李娜', color:'#8b5cf6'},
-            {id:'p3', name:'王磊', color:'#f59e0b'}
-        ];
-        data.projects = [{id:'pr1', name:'产品发布'}];
-        data.tasks = [
-            {id:'t1', projectId:'pr1', personIds:['p1','p2'], name:'需求分析', startDate:d(now.getDate()-5), endDate:d(now.getDate()+2), status:'done', progress:100,
-                subtasks:[
-                    {id:'s1', name:'用户访谈', done:true, personIds:['p1']},
-                    {id:'s2', name:'竞品报告', done:true, personIds:['p2']}
-                ]},
-            {id:'t2', projectId:'pr1', personIds:['p3'], name:'界面设计', startDate:d(now.getDate()+1), endDate:d(now.getDate()+6), status:'in-progress', progress:40,
-                subtasks:[
-                    {id:'s3', name:'首页设计', done:false, personIds:['p3']}
-                ]}
-        ];
-        save(); renderAll();
-        document.querySelector('.granularity-btn[data-gran="day"]').click();
-    };
-    window.exportData = () => {
-        const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gantt.json'; a.click();
-    };
-    window.importData = (e) => {
-        const file = e.target.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-            try {
-                data = JSON.parse(ev.target.result);
-                data.tasks.forEach(t => { if (!t.subtasks) t.subtasks = []; t.subtasks.forEach(s => { if(!s.personIds) s.personIds = []; }); });
-                save(); renderAll();
-            } catch(ex) { alert('文件格式错误'); }
-        };
-        reader.readAsText(file);
-    };
-    window.clearAllData = () => { if (confirm('清空所有数据？')) { data = { people:[], projects:[], tasks:[] }; save(); renderAll(); } };
-
-    // 启动
-    load();
-    if (!data.tasks.length && !data.projects.length) loadDemoData();
-    else renderAll();
 })();
 </script>
 </body>
