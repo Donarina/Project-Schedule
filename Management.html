@@ -72,7 +72,7 @@
         }
         .task-card:hover { border-color: #cbd5e1; }
         .task-header { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .task-expand { font-size: 0.8rem; transition: transform 0.2s; user-select: none; width: 16px; text-align: center; }
+        .task-expand { font-size: 0.8rem; transition: transform 0.2s; user-select: none;-webkit-user-select: none; width: 16px; text-align: center; }
         .task-expand.open { transform: rotate(90deg); }
         .task-info { flex: 1; min-width: 0; }
         .task-name { font-weight: 600; font-size: 0.85rem; }
@@ -195,8 +195,8 @@
             <div class="sidebar-section">
                 <div class="section-title"><span class="dot people"></span> 人员管理</div>
                 <div class="input-row">
-                    <input type="text" id="personName" placeholder="姓名" style="flex:2;">
-                    <input type="color" id="personColor" value="#3b82f6" style="width:40px; height:36px;">
+                    <input type="text" id="personName" placeholder="姓名" aria-label="人员姓名" style="flex:2;">
+                    <input type="color" id="personColor" value="#3b82f6" style="width:40px; height:36px;" aria-label="人员标签颜色">
                     <button class="btn btn-primary btn-xs" onclick="addPerson()">+</button>
                 </div>
                 <ul id="peopleList" style="list-style:none; margin-top:8px; font-size:0.8rem;"></ul>
@@ -204,7 +204,7 @@
             <div class="sidebar-section">
                 <div class="section-title"><span class="dot project"></span> 项目</div>
                 <div class="input-row">
-                    <input type="text" id="projectName" placeholder="项目名称" style="flex:2;">
+                    <input type="text" id="projectName" placeholder="项目名称" aria-label="项目名称" style="flex:2;">
                     <button class="btn btn-primary btn-xs" onclick="addProject()">+</button>
                 </div>
                 <ul id="projectsList" style="list-style:none; margin-top:8px; font-size:0.8rem;"></ul>
@@ -212,14 +212,14 @@
             <div class="sidebar-section">
                 <div class="section-title"><span class="dot task"></span> 新建任务</div>
                 <div class="input-row" style="flex-direction: column; gap:6px;">
-                    <input type="text" id="taskName" placeholder="任务名称">
+                    <input type="text" id="taskName" placeholder="任务名称" aria-label="任务名称">
                     <select id="taskProject"><option value="">无项目</option></select>
-                    <select id="taskPerson" multiple size="2"><option value="">负责人</option></select>
+                    <select id="taskPerson" multiple size="2" aria-label="任务负责人（可多选）"><option value="">负责人</option></select>
                     <div style="display:flex; gap:6px;">
-                        <input type="date" id="taskStartDate">
-                        <input type="date" id="taskEndDate">
+                        <input type="date" id="taskStartDate" aria-label="开始日期">
+                        <input type="date" id="taskEndDate" aria-label="结束日期">
                     </div>
-                    <select id="taskStatus"><option value="todo">未开始</option><option value="in-progress" selected>进行中</option><option value="done">已完成</option></select>
+                    <select id="taskStatus" aria-label="任务状态"><option value="todo">未开始</option><option value="in-progress" selected>进行中</option><option value="done">已完成</option></select>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <input type="range" id="taskProgress" min="0" max="100" value="0" oninput="progVal.textContent=this.value+'%'">
                         <span id="progVal" style="font-size:0.75rem;">0%</span>
