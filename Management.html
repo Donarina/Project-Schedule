@@ -192,6 +192,46 @@
             background: #f8fafc;
         }
 
+
+        /* ========== UI polish: keep original functions, improve visual quality ========== */
+        body { background: linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%); }
+        .header { padding: 14px 28px; background: rgba(255,255,255,0.96); backdrop-filter: blur(10px); }
+        .logo .icon { box-shadow: 0 8px 18px rgba(59,130,246,.25); }
+        .btn { box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+        .btn-primary, .btn-success { border-color: transparent; }
+        .btn-xs { padding: 4px 10px; }
+        .sidebar { background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); }
+        .sidebar-section { padding: 18px; }
+        .section-title { font-size: .82rem; color: #334155; }
+        input[type="text"], input[type="date"], select {
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            padding: 7px 9px;
+            background: #ffffff;
+            outline: none;
+            transition: border-color .18s, box-shadow .18s, background .18s;
+        }
+        input[type="text"]:focus, input[type="date"]:focus, select:focus {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+            background: #fff;
+        }
+        input[type="color"] { border: 1px solid #d7dee8; border-radius: 8px; padding: 2px; background: #fff; }
+        input[type="range"] { accent-color: var(--primary); }
+        .task-card {
+            border-color: #e5ebf3;
+            box-shadow: 0 2px 8px rgba(15,23,42,.04);
+        }
+        .task-card:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(15,23,42,.07); }
+        .gantt-toolbar { padding: 10px 18px; background: #fbfdff; }
+        .granularity-bar { padding: 4px; box-shadow: inset 0 0 0 1px rgba(148,163,184,.12); }
+        .granularity-btn.active { color: #0f172a; box-shadow: 0 3px 10px rgba(15,23,42,.10); }
+        .gantt-header-row { box-shadow: 0 1px 0 rgba(148,163,184,.16); }
+        .gantt-row:hover .gantt-row-left { background: #f8fbff; }
+        .gantt-bar { border-radius: 7px; box-shadow: 0 4px 10px rgba(15,23,42,.14); }
+        .progress-fill { background: linear-gradient(90deg, #10b981, #34d399); }
+        .user-pill { padding: 4px 10px; background: #f8fafc; }
+        .auth-card { border: 1px solid rgba(226,232,240,.9); }
     </style>
 </head>
 <body>
@@ -319,6 +359,37 @@
     const UW = { day:28, month:56, quarter:80, year:100 };
     const getUW = () => UW[gran] || 28;
 
+    // 任务完成度规则：如果有子任务，则按“已完成子任务 / 子任务总数”自动计算；
+    // 如果没有子任务，则使用新建任务时的手动进度值。避免新建/新增子任务后直接显示 100%。
+    function clampProgress(v) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return 0;
+        return Math.max(0, Math.min(100, Math.round(n)));
+    }
+    function calcTaskProgress(task) {
+        const subs = Array.isArray(task?.subtasks) ? task.subtasks : [];
+        if (subs.length > 0) {
+            const doneCount = subs.filter(s => !!s.done).length;
+            return Math.round(doneCount / subs.length * 100);
+        }
+        return clampProgress(task?.progress || 0);
+    }
+    function deriveTaskStatus(task) {
+        const progress = calcTaskProgress(task);
+        if (progress >= 100) return 'done';
+        if (progress > 0) return 'in-progress';
+        return task?.status === 'todo' ? 'todo' : 'in-progress';
+    }
+    function refreshTaskProgressFromSubtasks(task) {
+        if (!task) return;
+        if (Array.isArray(task.subtasks) && task.subtasks.length > 0) {
+            task.progress = calcTaskProgress(task);
+            task.status = deriveTaskStatus(task);
+        } else {
+            task.progress = clampProgress(task.progress || 0);
+        }
+    }
+
     function normalizeData() {
         if (!data || typeof data !== 'object') data = { people: [], projects: [], tasks: [] };
         if (!Array.isArray(data.people)) data.people = [];
@@ -329,6 +400,7 @@
             if (t.progress === undefined) t.progress = 0;
             if (!t.subtasks) t.subtasks = [];
             t.subtasks.forEach(s => { if (!s.personIds) s.personIds = []; });
+            refreshTaskProgressFromSubtasks(t);
         });
     }
 
@@ -392,7 +464,6 @@
 
     // 过滤
     function applyFilter() { filter.kw = document.getElementById('searchKeyword').value.trim().toLowerCase(); renderAll(); }
-    window.applyFilter = applyFilter;
     function match(task, proj) {
         if (!filter.kw) return true;
         const k = filter.kw;
@@ -445,23 +516,43 @@
         if (end < start) return alert('日期错误');
         data.tasks.push({ id: Date.now().toString(36), projectId: projId, personIds: pids, name, startDate: start, endDate: end, status, progress: prog, subtasks: [] });
         document.getElementById('taskName').value = '';
+        document.getElementById('taskProgress').value = 0;
+        document.getElementById('progVal').textContent = '0%';
         save(); renderAll();
     };
     window.deleteTask = (id) => { if (confirm('删除任务？')) { data.tasks = data.tasks.filter(t => t.id !== id); save(); renderAll(); } };
     window.updateTaskStatus = (id, st) => {
         const t = data.tasks.find(x => x.id === id);
-        if (t) { t.status = st; if (st === 'done') t.progress = 100; save(); renderAll(); }
+        if (t) {
+            t.status = st;
+            if (!t.subtasks || !t.subtasks.length) {
+                if (st === 'done') t.progress = 100;
+                if (st === 'todo') t.progress = 0;
+            } else {
+                refreshTaskProgressFromSubtasks(t);
+            }
+            save(); renderAll();
+        }
     };
 
     // 子任务操作（侧边栏内）
     window.toggleExpand = (id) => { expanded[id] = !expanded[id]; renderAll(); };
     window.toggleSubDone = (taskId, subId) => {
         const t = data.tasks.find(x => x.id === taskId);
-        if (t) { const s = t.subtasks.find(x => x.id === subId); if (s) s.done = !s.done; save(); renderAll(); }
+        if (t) {
+            const s = t.subtasks.find(x => x.id === subId);
+            if (s) s.done = !s.done;
+            refreshTaskProgressFromSubtasks(t);
+            save(); renderAll();
+        }
     };
     window.deleteSub = (taskId, subId) => {
         const t = data.tasks.find(x => x.id === taskId);
-        if (t) { t.subtasks = t.subtasks.filter(s => s.id !== subId); save(); renderAll(); }
+        if (t) {
+            t.subtasks = t.subtasks.filter(s => s.id !== subId);
+            refreshTaskProgressFromSubtasks(t);
+            save(); renderAll();
+        }
     };
     window.addSub = (taskId, nameInput, personSelect) => {
         const name = nameInput.value.trim();
@@ -471,6 +562,7 @@
             const pids = personSelect ? Array.from(personSelect.selectedOptions).map(o => o.value).filter(v => v) : [];
             t.subtasks.push({ id: Date.now().toString(36), name, done: false, personIds: pids });
             nameInput.value = '';
+            refreshTaskProgressFromSubtasks(t);
             save(); renderAll();
         }
     };
@@ -484,12 +576,12 @@
         list.innerHTML = data.tasks.map(t => {
             const proj = data.projects.find(p => p.id === t.projectId);
             const persons = t.personIds.map(id => data.people.find(p => p.id === id)).filter(Boolean);
-            const progress = t.progress || 0;
-            const done = t.status === 'done' || progress === 100;
+            const progress = calcTaskProgress(t);
+            const displayStatus = deriveTaskStatus(t);
             const isExpanded = expanded[t.id] || false;
             const subCount = t.subtasks?.length || 0;
             const completedSubs = t.subtasks?.filter(s => s.done).length || 0;
-            let statusClass = t.status === 'done' ? 'status-done' : (t.status === 'in-progress' ? 'status-progress' : 'status-todo');
+            let statusClass = displayStatus === 'done' ? 'status-done' : (displayStatus === 'in-progress' ? 'status-progress' : 'status-todo');
             return `<div class="task-card">
                 <div class="task-header" onclick="toggleExpand('${t.id}')">
                     <span class="task-expand ${isExpanded?'open':''}">▶</span>
@@ -497,7 +589,7 @@
                         <div class="task-name">${t.name}</div>
                         <div class="task-meta">
                             <span>${proj ? proj.name : '无项目'}</span>
-                            <span class="status-badge ${statusClass}">${t.status==='done'?'完成':(t.status==='in-progress'?'进行中':'未开始')}</span>
+                            <span class="status-badge ${statusClass}">${displayStatus==='done'?'完成':(displayStatus==='in-progress'?'进行中':'未开始')}</span>
                             ${subCount > 0 ? `<span>📋 ${completedSubs}/${subCount}</span>` : ''}
                         </div>
                     </div>
@@ -562,7 +654,8 @@
                 const color = getTaskColor(t);
                 const pos = getBarPos(t, units, uw);
                 const isExpanded = expanded[t.id] || false;
-                const progress = t.progress || 0;
+                const progress = calcTaskProgress(t);
+                const displayStatus = deriveTaskStatus(t);
                 const hasSubs = t.subtasks?.length > 0;
                 html += `<div class="gantt-row"><div class="gantt-row-left">
                     <span class="task-expand ${isExpanded?'open':''}" onclick="toggleExpand('${t.id}')">${hasSubs?'▶':'•'}</span>
@@ -572,7 +665,7 @@
                 </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}`;
                 if (pos) {
                     const left = Math.max(0, pos.left), width = Math.min(pos.width, units.length*uw - left);
-                    const doneClass = (t.status === 'done' || progress === 100) ? ' task-done' : '';
+                    const doneClass = (displayStatus === 'done' || progress === 100) ? ' task-done' : '';
                     html += `<div class="gantt-bar${doneClass}" style="left:${left}px; width:${width}px; background:${color};">
                         <div class="progress-overlay" style="width:${progress}%;"></div><span>${t.name}</span></div>`;
                 }
@@ -606,7 +699,8 @@
     }
 
     function getTaskColor(task) {
-        if (task.status === 'done' || task.progress === 100) return '#10b981'; // 完成绿色
+        const progress = calcTaskProgress(task);
+        if (deriveTaskStatus(task) === 'done' || progress === 100) return '#10b981'; // 完成绿色
         const firstPerson = data.people.find(p => p.id === task.personIds?.[0]);
         return firstPerson?.color || '#8899aa';
     }
@@ -697,10 +791,10 @@
         ];
         data.projects = [{id:'pr1', name:'产品发布'}];
         data.tasks = [
-            {id:'t1', projectId:'pr1', personIds:['p1','p2'], name:'需求分析', startDate:d(now.getDate()-5), endDate:d(now.getDate()+2), status:'done', progress:100,
+            {id:'t1', projectId:'pr1', personIds:['p1','p2'], name:'需求分析', startDate:d(now.getDate()-5), endDate:d(now.getDate()+2), status:'in-progress', progress:50,
                 subtasks:[
                     {id:'s1', name:'用户访谈', done:true, personIds:['p1']},
-                    {id:'s2', name:'竞品报告', done:true, personIds:['p2']}
+                    {id:'s2', name:'竞品报告', done:false, personIds:['p2']}
                 ]},
             {id:'t2', projectId:'pr1', personIds:['p3'], name:'界面设计', startDate:d(now.getDate()+1), endDate:d(now.getDate()+6), status:'in-progress', progress:40,
                 subtasks:[
@@ -720,7 +814,7 @@
         reader.onload = ev => {
             try {
                 data = JSON.parse(ev.target.result);
-                data.tasks.forEach(t => { if (!t.subtasks) t.subtasks = []; t.subtasks.forEach(s => { if(!s.personIds) s.personIds = []; }); });
+                normalizeData();
                 save(); renderAll();
             } catch(ex) { alert('文件格式错误'); }
         };
