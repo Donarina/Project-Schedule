@@ -113,7 +113,7 @@
             cursor: pointer; font-size: 0.8rem; font-weight: 500; color: var(--text-light); transition: 0.2s;
         }
         .granularity-btn.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
-        .gantt-scroll { flex: 1; overflow: auto; max-width: 100%; scrollbar-gutter: stable both-edges; }
+        .gantt-scroll { flex: 1; overflow: auto; max-width: 100%; min-width: 0; scrollbar-gutter: stable both-edges; }
         .gantt-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
         .gantt-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
         .gantt-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; border: 3px solid #f1f5f9; }
@@ -973,12 +973,29 @@
     function centerGanttOnToday(units, uw) {
         const scroll = document.getElementById('ganttScroll');
         if (!scroll || !units || !units.length) return;
+
         const todayPos = getTodayLine(units, uw);
         if (todayPos < 0) return;
-        let targetLeft = todayPos - scroll.clientWidth / 2;
-        // 按天模式时，尽量让默认视图从“今天前 15 天”附近开始。
-        if (gran === 'day') targetLeft = todayPos - 15 * uw - 20;
-        scroll.scrollLeft = Math.max(0, targetLeft);
+
+        // 注意：ganttScroll 的 scrollLeft 是从整张表最左侧开始计算的，
+        // 其中包含左侧固定任务列 var(--left-w)。今天线的位置 todayPos
+        // 是在右侧时间轴内部的坐标，所以必须加上左侧列宽。
+        const leftCol = document.querySelector('.gantt-left')?.offsetWidth || 0;
+        const timelineViewport = Math.max(240, scroll.clientWidth - leftCol);
+        const fullContentWidth = document.getElementById('ganttTable')?.scrollWidth || scroll.scrollWidth;
+
+        let targetLeft;
+        if (gran === 'day') {
+            // 按天视图：默认让可视区域从“今天前 15 天”开始，
+            // 今天位于时间轴可视区域中间附近，后续日期通过底部横向滚动条查看。
+            targetLeft = leftCol + todayPos - 15 * uw;
+        } else {
+            // 周/月/季度/年：默认把今天居中。
+            targetLeft = leftCol + todayPos - timelineViewport / 2;
+        }
+
+        const maxLeft = Math.max(0, fullContentWidth - scroll.clientWidth);
+        scroll.scrollLeft = Math.max(0, Math.min(targetLeft, maxLeft));
     }
 
     function getTaskColor(task) {
