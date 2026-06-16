@@ -64,7 +64,23 @@
             font-size: 0.8rem; background: #fafbfc; transition: 0.2s; width: 100%;
         }
         .input-group select[multiple] { height: auto; min-height: 34px; }
-        .task-list { list-style: none; max-height: 380px; overflow-y: auto; margin-top: 8px; }
+        .task-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .task-form .full { grid-column: 1 / -1; }
+        .task-form-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .task-form-field label { font-size: 0.68rem; font-weight: 700; color: var(--text-light); }
+        .task-form input, .task-form select {
+            width: 100%; min-height: 36px; padding: 8px 10px; border: 1px solid var(--border);
+            border-radius: 10px; background: #fff; font-size: 0.8rem; outline: none;
+            transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+        }
+        .task-form input:focus, .task-form select:focus { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); background: #fff; }
+        .task-form select[multiple] { min-height: 74px; padding: 6px 8px; }
+        .task-progress-row { display: grid; grid-template-columns: 1fr 42px; align-items: center; gap: 10px; }
+        .task-progress-row input[type="range"] { padding: 0; min-height: 24px; }
+        .task-progress-row span { text-align: right; font-size: 0.78rem; color: var(--text-light); font-weight: 700; }
+        .task-add-btn { grid-column: 1 / -1; min-height: 38px; justify-content: center; border-radius: 10px; }
+        @media (max-width: 700px) { .task-form { grid-template-columns: 1fr; } }
+        .task-list { list-style: none; max-height: 380px; overflow-y: auto; margin-top: 12px; }
         .task-card {
             background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm);
             padding: 10px; margin-bottom: 6px; transition: all 0.2s; box-shadow: var(--shadow);
@@ -97,7 +113,11 @@
             cursor: pointer; font-size: 0.8rem; font-weight: 500; color: var(--text-light); transition: 0.2s;
         }
         .granularity-btn.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
-        .gantt-scroll { flex: 1; overflow: auto; }
+        .gantt-scroll { flex: 1; overflow: auto; max-width: 100%; scrollbar-gutter: stable both-edges; }
+        .gantt-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
+        .gantt-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
+        .gantt-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; border: 3px solid #f1f5f9; }
+        .gantt-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .gantt-table { display: flex; flex-direction: column; width: max-content; min-width: 100%; }
         .gantt-header-row { display: flex; position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 2px solid var(--border); height: var(--gantt-header-h); }
         .gantt-left { width: var(--left-w); min-width: var(--left-w); position: sticky; left: 0; background: #fff; padding: 0 16px; border-right: 2px solid var(--border); display: flex; align-items: flex-end; font-weight: 700; font-size: 0.8rem; }
@@ -385,20 +405,39 @@
         </div>
         <div class="sidebar-section">
             <div class="section-title"><span class="dot task"></span> 新建任务</div>
-            <div class="input-row" style="flex-direction: column; gap:6px;">
-                <input type="text" id="taskName" placeholder="任务名称">
-                <select id="taskProject"><option value="">无项目</option></select>
-                <select id="taskPerson" multiple size="2"><option value="">负责人</option></select>
-                <div style="display:flex; gap:6px;">
+            <div class="task-form">
+                <div class="task-form-field full">
+                    <label for="taskName">任务名称</label>
+                    <input type="text" id="taskName" placeholder="请输入任务名称">
+                </div>
+                <div class="task-form-field">
+                    <label for="taskProject">所属项目</label>
+                    <select id="taskProject"><option value="">无项目</option></select>
+                </div>
+                <div class="task-form-field">
+                    <label for="taskStatus">任务状态</label>
+                    <select id="taskStatus"><option value="todo">未开始</option><option value="in-progress" selected>进行中</option><option value="done">已完成</option></select>
+                </div>
+                <div class="task-form-field full">
+                    <label for="taskPerson">负责人，可多选</label>
+                    <select id="taskPerson" multiple size="3"><option value="">负责人</option></select>
+                </div>
+                <div class="task-form-field">
+                    <label for="taskStartDate">开始日期</label>
                     <input type="date" id="taskStartDate">
+                </div>
+                <div class="task-form-field">
+                    <label for="taskEndDate">结束日期</label>
                     <input type="date" id="taskEndDate">
                 </div>
-                <select id="taskStatus"><option value="todo">未开始</option><option value="in-progress" selected>进行中</option><option value="done">已完成</option></select>
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <input type="range" id="taskProgress" min="0" max="100" value="0" oninput="progVal.textContent=this.value+'%'">
-                    <span id="progVal" style="font-size:0.75rem;">0%</span>
+                <div class="task-form-field full">
+                    <label for="taskProgress">初始进度</label>
+                    <div class="task-progress-row">
+                        <input type="range" id="taskProgress" min="0" max="100" value="0" oninput="document.getElementById('progVal').textContent=this.value+'%'">
+                        <span id="progVal">0%</span>
+                    </div>
                 </div>
-                <button class="btn btn-primary btn-xs" onclick="addTask()">+ 添加任务</button>
+                <button class="btn btn-primary task-add-btn" onclick="addTask()">+ 添加任务</button>
             </div>
             <div class="task-list" id="tasksList"></div>
         </div>
@@ -505,6 +544,7 @@
     let filter = { kw: '' };
     let gran = 'day';
     let expanded = {}; // 甘特图展开状态
+    let centerTodayOnNextRender = true; // 初次加载/切换粒度/新增任务后，默认把视图定位到今天附近
 
     const UW = { day:28, week:54, month:56, quarter:80, year:100 };
     const getUW = () => UW[gran] || 28;
@@ -924,6 +964,21 @@
         });
         html += '</div>';
         table.innerHTML = html;
+        if (centerTodayOnNextRender) {
+            requestAnimationFrame(() => centerGanttOnToday(units, uw));
+            centerTodayOnNextRender = false;
+        }
+    }
+
+    function centerGanttOnToday(units, uw) {
+        const scroll = document.getElementById('ganttScroll');
+        if (!scroll || !units || !units.length) return;
+        const todayPos = getTodayLine(units, uw);
+        if (todayPos < 0) return;
+        let targetLeft = todayPos - scroll.clientWidth / 2;
+        // 按天模式时，尽量让默认视图从“今天前 15 天”附近开始。
+        if (gran === 'day') targetLeft = todayPos - 15 * uw - 20;
+        scroll.scrollLeft = Math.max(0, targetLeft);
     }
 
     function getTaskColor(task) {
@@ -953,15 +1008,53 @@
     function isToday(d) { const t=new Date(); return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate(); }
 
     function getRange() {
-        if (!data.tasks.length) { const n=new Date(); return { start: new Date(n.getFullYear(), n.getMonth(), 1), end: new Date(n.getFullYear(), n.getMonth()+1, 0) }; }
-        let min=null, max=null;
-        data.tasks.forEach(t => { const s=new Date(t.startDate+'T00:00:00'), e=new Date(t.endDate+'T00:00:00'); if(!min||s<min) min=s; if(!max||e>max) max=e; });
-        const ps=new Date(min), pe=new Date(max);
-        if (gran==='day') { ps.setDate(ps.getDate()-3); pe.setDate(pe.getDate()+3); }
-        else if (gran==='week') { const ws = weekStart(ps); ps.setTime(ws.getTime()); ps.setDate(ps.getDate()-7); const we = weekEnd(pe); pe.setTime(we.getTime()); pe.setDate(pe.getDate()+7); }
-        else if (gran==='month') { ps.setDate(1); ps.setMonth(ps.getMonth()-1); pe.setMonth(pe.getMonth()+2); pe.setDate(0); }
-        else if (gran==='quarter') { ps.setMonth(Math.floor(ps.getMonth()/3)*3-3); pe.setMonth(Math.floor(pe.getMonth()/3)*3+6); pe.setDate(0); }
-        else if (gran==='year') { ps.setFullYear(ps.getFullYear()-1); ps.setMonth(0); ps.setDate(1); pe.setFullYear(pe.getFullYear()+1); pe.setMonth(11); pe.setDate(31); }
+        const today = new Date(); today.setHours(0,0,0,0);
+        let min = new Date(today), max = new Date(today);
+        data.tasks.forEach(t => {
+            const s = new Date(t.startDate+'T00:00:00'), e = new Date(t.endDate+'T00:00:00');
+            if (!isNaN(s) && s < min) min = s;
+            if (!isNaN(e) && e > max) max = e;
+        });
+        const ps = new Date(min), pe = new Date(max);
+        // 日期范围始终覆盖“今天前后 15 天”以及所有任务跨度。
+        // 这样时间跨度很远时，甘特图不会被压缩到一个页面里，而是生成完整时间轴，
+        // 初始视图定位在今天附近，其余远期/历史任务通过底部横向滚动条查看。
+        if (gran==='day') {
+            const t1 = new Date(today), t2 = new Date(today);
+            t1.setDate(t1.getDate()-15); t2.setDate(t2.getDate()+15);
+            if (t1 < ps) ps.setTime(t1.getTime());
+            if (t2 > pe) pe.setTime(t2.getTime());
+            ps.setDate(ps.getDate()-2); pe.setDate(pe.getDate()+2);
+        }
+        else if (gran==='week') {
+            const t1 = new Date(today), t2 = new Date(today);
+            t1.setDate(t1.getDate()-21); t2.setDate(t2.getDate()+21);
+            if (t1 < ps) ps.setTime(t1.getTime());
+            if (t2 > pe) pe.setTime(t2.getTime());
+            const ws = weekStart(ps); ps.setTime(ws.getTime()); ps.setDate(ps.getDate()-7);
+            const we = weekEnd(pe); pe.setTime(we.getTime()); pe.setDate(pe.getDate()+7);
+        }
+        else if (gran==='month') {
+            const t1 = new Date(today.getFullYear(), today.getMonth()-3, 1);
+            const t2 = new Date(today.getFullYear(), today.getMonth()+4, 0);
+            if (t1 < ps) ps.setTime(t1.getTime());
+            if (t2 > pe) pe.setTime(t2.getTime());
+            ps.setDate(1); ps.setMonth(ps.getMonth()-1); pe.setMonth(pe.getMonth()+2); pe.setDate(0);
+        }
+        else if (gran==='quarter') {
+            const t1 = new Date(today.getFullYear(), Math.floor(today.getMonth()/3)*3-3, 1);
+            const t2 = new Date(today.getFullYear(), Math.floor(today.getMonth()/3)*3+6, 0);
+            if (t1 < ps) ps.setTime(t1.getTime());
+            if (t2 > pe) pe.setTime(t2.getTime());
+            ps.setMonth(Math.floor(ps.getMonth()/3)*3-3); pe.setMonth(Math.floor(pe.getMonth()/3)*3+6); pe.setDate(0);
+        }
+        else if (gran==='year') {
+            const t1 = new Date(today.getFullYear()-1, 0, 1);
+            const t2 = new Date(today.getFullYear()+1, 11, 31);
+            if (t1 < ps) ps.setTime(t1.getTime());
+            if (t2 > pe) pe.setTime(t2.getTime());
+            ps.setFullYear(ps.getFullYear()-1); ps.setMonth(0); ps.setDate(1); pe.setFullYear(pe.getFullYear()+1); pe.setMonth(11); pe.setDate(31);
+        }
         return { start: ps, end: pe };
     }
     function genUnits(start, end) {
@@ -1028,6 +1121,7 @@
         const btn = e.target.closest('.granularity-btn');
         if (btn) {
             gran = btn.dataset.gran;
+            centerTodayOnNextRender = true;
             document.querySelectorAll('.granularity-btn').forEach(b => b.classList.toggle('active', b.dataset.gran === gran));
             renderGantt();
         }
@@ -1053,6 +1147,7 @@
                     {id:'s3', name:'首页设计', done:false, personIds:['p3']}
                 ]}
         ];
+        centerTodayOnNextRender = true;
         save(); renderAll();
         document.querySelector('.granularity-btn[data-gran="day"]').click();
     };
@@ -1067,12 +1162,13 @@
             try {
                 data = JSON.parse(ev.target.result);
                 normalizeData();
+                centerTodayOnNextRender = true;
                 save(); renderAll();
             } catch(ex) { alert('文件格式错误'); }
         };
         reader.readAsText(file);
     };
-    window.clearAllData = () => { if (confirm('清空所有数据？')) { data = { people:[], projects:[], tasks:[] }; save(); renderAll(); } };
+    window.clearAllData = () => { if (confirm('清空所有数据？')) { data = { people:[], projects:[], tasks:[] }; centerTodayOnNextRender = true; save(); renderAll(); } };
 
 
     // ========== 在线注册 / 登录 / 登出 ==========
