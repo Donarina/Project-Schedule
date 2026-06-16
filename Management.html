@@ -1,564 +1,482 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>高级项目甘特图 · Supabase 云端同步</title>
-  <style>
-    :root{
-      --bg:#f3f6fb; --card:#ffffff; --border:#dbe4f0; --text:#172033; --muted:#667085;
-      --primary:#2563eb; --primary-dark:#1d4ed8; --danger:#ef4444; --success:#10b981;
-      --line:#edf2f7; --soft:#f8fafc; --shadow:0 12px 36px rgba(15,23,42,.10);
-      --radius:14px; --left-w:390px; --row-h:50px; --head-h:60px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
-    button,input,select,textarea{font:inherit}
-    button{user-select:none}
-    .hidden{display:none!important}
-    .auth-wrap{height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,#eef6ff,#f8fafc 42%,#eef2ff)}
-    .auth-card{width:min(430px,100%);background:#fff;border:1px solid var(--border);border-radius:22px;box-shadow:var(--shadow);padding:32px}
-    .auth-card h1{margin:0 0 8px;font-size:25px;letter-spacing:-.02em}
-    .auth-card p{margin:0 0 22px;color:var(--muted);font-size:14px;line-height:1.6}
-    .field{display:flex;flex-direction:column;gap:7px;margin-bottom:13px}
-    .field label{font-size:13px;color:#475467}
-    .input,.field input,.field select,.field textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;outline:none}
-    .input:focus,.field input:focus,.field select:focus,.field textarea:focus{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(37,99,235,.10)}
-    .auth-actions{display:grid;gap:10px;margin-top:12px}
-    .auth-note{margin-top:14px;font-size:12px;line-height:1.7;color:var(--muted)}
-    .btn{border:1px solid var(--border);background:#fff;color:var(--text);border-radius:10px;padding:8px 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;transition:.12s}
-    .btn:hover{background:#f8fafc}
-    .btn:disabled{opacity:.55;cursor:not-allowed}
-    .btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
-    .btn-primary:hover{background:var(--primary-dark)}
-    .btn-danger{background:#fff1f2;color:#be123c;border-color:#fecdd3}
-    .btn-sm{padding:6px 10px;border-radius:8px;font-size:12px}
-    .btn-full{width:100%}
-    #app{height:100vh;display:flex;flex-direction:column}
-    .topbar{height:64px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:14px}
-    .brand{font-weight:800;font-size:18px;white-space:nowrap}
-    .top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-    .user-pill{font-size:13px;color:#475467;background:#f8fafc;border:1px solid var(--border);padding:7px 10px;border-radius:999px;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .layout{flex:1;min-height:0;display:flex}
-    .sidebar{width:430px;background:#fff;border-right:1px solid var(--border);overflow:auto;padding:16px}
-    .panel{border:1px solid var(--border);border-radius:var(--radius);padding:13px;margin-bottom:13px;background:#fff}
-    .panel-title{font-weight:750;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-    .row{display:flex;gap:8px;align-items:center}
-    .row>*{min-width:0}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .list{display:grid;gap:7px}
-    .item{border:1px solid var(--border);background:#fbfdff;border-radius:10px;padding:9px}
-    .item-line{display:flex;align-items:center;justify-content:space-between;gap:8px}
-    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:middle}
-    .muted{color:var(--muted);font-size:12px}
-    .task-card{cursor:pointer}
-    .task-card:hover{border-color:#bfdbfe;background:#f8fbff}
-    .status{font-size:11px;padding:2px 7px;border-radius:999px;white-space:nowrap}
-    .status-todo{background:#f1f5f9;color:#475569}
-    .status-progress{background:#fff7ed;color:#c2410c}
-    .status-done{background:#ecfdf5;color:#047857}
-    .progress{height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:7px}
-    .progress>span{display:block;height:100%;background:var(--success)}
-    .main{flex:1;min-width:0;display:flex;flex-direction:column}
-    .toolbar{min-height:56px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:12px;flex-wrap:wrap}
-    .seg{display:flex;background:#f1f5f9;border-radius:999px;padding:3px}
-    .seg button{border:0;background:transparent;border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px;color:#334155}
-    .seg button.active{background:#fff;box-shadow:0 1px 4px rgba(15,23,42,.12);color:#0f172a}
-    .gantt-scroll{flex:1;overflow:auto;position:relative;background:#fff}
-    .gantt-table{width:max-content;min-width:100%}
-    .g-row,.g-head{display:flex;min-width:max-content}
-    .g-head{position:sticky;top:0;z-index:5;background:#fff}
-    .g-left{position:sticky;left:0;z-index:4;width:var(--left-w);min-width:var(--left-w);background:#fff;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0 12px;display:flex;align-items:center}
-    .g-head .g-left{z-index:8;font-weight:700;height:var(--head-h)}
-    .g-right{position:relative;display:flex;border-bottom:1px solid var(--border)}
-    .g-head .g-right{height:var(--head-h)}
-    .unit{height:100%;border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center;text-align:center;color:#475467;font-size:12px;background:#fff;flex:0 0 auto}
-    .weekend{background:#fafafa}
-    .today-line{position:absolute;top:0;bottom:0;width:2px;background:var(--danger);z-index:3;pointer-events:none}
-    .bar{position:absolute;top:10px;height:30px;line-height:30px;border-radius:8px;color:white;padding:0 8px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 3px 8px rgba(15,23,42,.16);cursor:pointer}
-    .bar.done{opacity:.82}
-    .bar-progress{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);pointer-events:none}
-    .empty{padding:50px;text-align:center;color:var(--muted)}
-    .modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);display:grid;place-items:center;z-index:20;padding:16px}
-    .modal{width:min(580px,94vw);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:18px}
-    .modal h3{margin:0 0 12px}
-    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
-    .toast{position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;border-radius:12px;padding:11px 14px;font-size:13px;z-index:30;box-shadow:var(--shadow);max-width:480px}
-    .error-box{margin-top:12px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6}
-    @media(max-width:900px){.layout{flex-direction:column}.sidebar{width:100%;height:42vh;border-right:0;border-bottom:1px solid var(--border)}.topbar{height:auto;min-height:64px;align-items:flex-start;padding:12px 14px;flex-direction:column}.top-actions{justify-content:flex-start}.g-left{width:300px;min-width:300px}:root{--left-w:300px}}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目管理甘特图 · 云端同步</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* ========== 完整样式（包含所有原始样式 + 登录界面）========== */
+        :root {
+            --bg: #f4f6f9;
+            --card: #ffffff;
+            --border: #e2e6ed;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --primary: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --shadow: 0 1px 3px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --gantt-row-h: 44px;
+            --gantt-header-h: 52px;
+            --left-w: 360px;
+            --today-color: #ef4444;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+        .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+        .logo { font-size: 1.25rem; font-weight: 700; }
+        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 0.8rem; }
+        .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-outline { border-color: var(--border); }
+        .btn-xs { padding: 2px 8px; font-size: 0.7rem; }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 380px; background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; }
+        .gantt-area { flex: 1; display: flex; flex-direction: column; background: #fff; }
+        .gantt-toolbar { padding: 8px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+        .granularity-bar { display: flex; gap: 4px; background: #f1f5f9; border-radius: 20px; padding: 2px; }
+        .granularity-btn { padding: 4px 12px; border: none; background: transparent; border-radius: 20px; cursor: pointer; }
+        .granularity-btn.active { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .gantt-scroll { flex: 1; overflow: auto; }
+        .gantt-table { width: max-content; min-width: 100%; }
+        .gantt-header-row, .gantt-row { display: flex; }
+        .gantt-left { width: var(--left-w); position: sticky; left: 0; background: #fff; border-right: 1px solid var(--border); padding: 0 12px; display: flex; align-items: center; }
+        .gantt-right { flex: 1; display: flex; }
+        .gantt-unit { border-right: 1px solid #eee; text-align: center; font-size: 0.7rem; }
+        .gantt-bar { position: absolute; border-radius: 4px; background: #3b82f6; color: #fff; font-size: 0.7rem; padding: 0 6px; white-space: nowrap; overflow: hidden; cursor: pointer; }
+        .task-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+        .task-header { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .progress-bar { height: 4px; background: #e5e7eb; border-radius: 2px; margin: 6px 0; }
+        .progress-fill { height: 100%; background: var(--success); border-radius: 2px; }
+        .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-card { background: #fff; padding: 32px; border-radius: 16px; width: 360px; text-align: center; box-shadow: var(--shadow-md); }
+        .login-card input { width: 100%; margin-bottom: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+        .login-card button { width: 100%; margin-top: 6px; }
+        input, select { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); }
+        .input-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .section-title { font-weight: 600; margin: 12px 0 8px; }
+        .person-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .status-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 12px; }
+        .status-done { background: #d1fae5; color: #065f46; }
+        .status-progress { background: #fff3e0; color: #9a3412; }
+        .status-todo { background: #f1f5f9; color: #475569; }
+        #ganttApp { height: 100vh; flex-direction: column; }
+    </style>
 </head>
 <body>
-  <section id="authPanel" class="auth-wrap">
-    <div class="auth-card">
-      <h1>📊 高级甘特图</h1>
-      <p>注册/登录后，每个账号独立保存自己的项目数据。</p>
-      <div class="field"><label for="email">邮箱</label><input id="email" type="email" placeholder="name@example.com" autocomplete="email"></div>
-      <div class="field"><label for="password">密码</label><input id="password" type="password" placeholder="至少 6 位" autocomplete="current-password"></div>
-      <div class="auth-actions">
-        <button id="loginBtn" type="button" class="btn btn-primary btn-full">登录</button>
-        <button id="signupBtn" type="button" class="btn btn-full">注册新账号</button>
-      </div>
-      <div class="auth-note">首次注册后，如果 Supabase 开启了邮箱确认，需要先到邮箱点击确认链接；如果关闭邮箱确认，则可直接登录。</div>
-      <div id="authError" class="error-box hidden"></div>
+
+<!-- 登录界面 -->
+<div id="loginPanel" class="login-container">
+    <div class="login-card">
+        <h2>📊 甘特图 · 云端同步</h2>
+        <p>登录后数据自动保存，多设备同步</p>
+        <input type="email" id="loginEmail" placeholder="邮箱">
+        <input type="password" id="loginPassword" placeholder="密码">
+        <button class="btn btn-primary" id="btnLogin">登录</button>
+        <button class="btn btn-outline" id="btnSignup" style="margin-top: 10px;">注册新账号</button>
     </div>
-  </section>
+</div>
 
-  <section id="app" class="hidden">
-    <header class="topbar">
-      <div class="brand">📊 项目管理甘特图 · 云端同步</div>
-      <div class="top-actions">
-        <span id="userEmail" class="user-pill"></span>
-        <button class="btn btn-sm" type="button" id="saveBtn">保存</button>
-        <button class="btn btn-sm" type="button" id="demoBtn">示例数据</button>
-        <button class="btn btn-sm" type="button" id="exportBtn">导出</button>
-        <label class="btn btn-sm">导入<input id="importFile" type="file" accept="application/json,.json" hidden></label>
-        <button class="btn btn-sm btn-danger" type="button" id="clearBtn">清空</button>
-        <button class="btn btn-sm" type="button" id="logoutBtn">退出</button>
-      </div>
-    </header>
-
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="panel">
-          <div class="panel-title">🔍 过滤</div>
-          <input id="search" class="input" placeholder="搜索任务 / 项目 / 人员">
+<!-- 甘特图主界面 -->
+<div id="ganttApp" style="display: none;">
+    <div class="header">
+        <div class="logo">📊 项目管理甘特图 · 云端同步</div>
+        <div style="display: flex; gap: 8px;">
+            <span id="userEmailSpan"></span>
+            <button class="btn btn-outline" id="btnLogout">退出</button>
+            <button class="btn btn-outline" onclick="manualSave()">保存</button>
+            <button class="btn btn-outline" onclick="loadDemoData()">示例数据</button>
+            <button class="btn btn-outline" onclick="exportData()">导出</button>
+            <label class="btn btn-outline" style="cursor:pointer;">导入<input type="file" accept=".json" hidden onchange="importData(event)"></label>
+            <button class="btn btn-outline" onclick="clearAllData()">清空</button>
         </div>
-
-        <div class="panel">
-          <div class="panel-title">👥 人员管理</div>
-          <div class="row">
-            <input id="personName" class="input" placeholder="姓名">
-            <input id="personColor" type="color" value="#2563eb" style="width:46px;height:40px;border:1px solid var(--border);border-radius:10px;background:#fff">
-            <button id="addPersonBtn" type="button" class="btn btn-primary">+</button>
-          </div>
-          <div id="peopleList" class="list" style="margin-top:10px"></div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-title">📁 项目管理</div>
-          <div class="row">
-            <input id="projectName" class="input" placeholder="项目名称">
-            <button id="addProjectBtn" type="button" class="btn btn-primary">+</button>
-          </div>
-          <div id="projectList" class="list" style="margin-top:10px"></div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-title"><span>📝 任务列表</span><button id="openTaskModalBtn" type="button" class="btn btn-sm btn-primary">新建</button></div>
-          <div id="taskList" class="list"></div>
-        </div>
-      </aside>
-
-      <main class="main">
-        <div class="toolbar">
-          <div id="ganttInfo" class="muted">共 0 个任务</div>
-          <div class="seg" id="granularity">
-            <button type="button" data-gran="day" class="active">天</button>
-            <button type="button" data-gran="week">周</button>
-            <button type="button" data-gran="month">月</button>
-            <button type="button" data-gran="quarter">季度</button>
-            <button type="button" data-gran="year">年</button>
-          </div>
-        </div>
-        <div id="ganttScroll" class="gantt-scroll"><div id="ganttTable" class="gantt-table"></div></div>
-      </main>
     </div>
-  </section>
-
-  <div id="taskModal" class="modal-mask hidden">
-    <div class="modal">
-      <h3 id="taskModalTitle">新建任务</h3>
-      <input id="taskId" type="hidden">
-      <div class="field"><label for="taskName">任务名称</label><input id="taskName" class="input"></div>
-      <div class="grid2">
-        <div class="field"><label for="taskProject">项目</label><select id="taskProject" class="input"></select></div>
-        <div class="field"><label for="taskStatus">状态</label><select id="taskStatus" class="input"><option value="todo">未开始</option><option value="in-progress">进行中</option><option value="done">已完成</option></select></div>
-      </div>
-      <div class="grid2">
-        <div class="field"><label for="taskStart">开始日期</label><input id="taskStart" type="date" class="input"></div>
-        <div class="field"><label for="taskEnd">结束日期</label><input id="taskEnd" type="date" class="input"></div>
-      </div>
-      <div class="grid2">
-        <div class="field"><label for="taskPeople">负责人，可多选</label><select id="taskPeople" class="input" multiple size="4"></select></div>
-        <div class="field"><label for="taskProgress">进度：<span id="progressText">0%</span></label><input id="taskProgress" type="range" min="0" max="100" value="0"></div>
-      </div>
-      <div class="field"><label for="taskNote">备注</label><textarea id="taskNote" class="input" rows="3"></textarea></div>
-      <div class="modal-actions">
-        <button id="cancelTaskBtn" type="button" class="btn">取消</button>
-        <button id="deleteTaskBtn" type="button" class="btn btn-danger hidden">删除</button>
-        <button id="saveTaskBtn" type="button" class="btn btn-primary">保存任务</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-  (function(){
-    'use strict';
-
-    /**********************************************************************
-     * 重要：只需要修改下面两行
-     * 1) SUPABASE_URL 不要带 /rest/v1/
-     * 2) 前端只能使用 Publishable key，例如 sb_publishable_xxx
-     **********************************************************************/
-    const SUPABASE_URL = 'https://bymeuixlakbqeapoztqg.supabase.co';
-    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Sg8GBHs3aQS0CuY71EEqAA_R4GKThED';
-
-    let supabaseClient = null;
-    let currentUser = null;
-    let state = { people: [], projects: [], tasks: [] };
-    let gran = 'day';
-    let keyword = '';
-    let saveTimer = null;
-
-    const UNIT = { day:28, week:42, month:64, quarter:86, year:110 };
-    const $ = id => document.getElementById(id);
-
-    function initSupabase(){
-      if (!window.supabase || typeof window.supabase.createClient !== 'function') {
-        showAuthError('Supabase SDK 没有加载成功。请检查网络、CDN 是否被拦截，或把 CDN 换成 https://unpkg.com/@supabase/supabase-js@2');
-        return false;
-      }
-      if (SUPABASE_URL.includes('你的项目ID') || SUPABASE_PUBLISHABLE_KEY.includes('你的-')) {
-        showAuthError('请先在 HTML 代码中填写 SUPABASE_URL 和 SUPABASE_PUBLISHABLE_KEY。');
-        return false;
-      }
-      if (SUPABASE_URL.includes('/rest/v1')) {
-        showAuthError('SUPABASE_URL 不要带 /rest/v1/，应为 https://项目ID.supabase.co');
-        return false;
-      }
-      // 注意：变量名使用 supabaseClient，避免与 window.supabase 冲突。
-      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-      return true;
-    }
-
-    function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
-    function uid(prefix){ return prefix + '_' + crypto.randomUUID(); }
-    function todayISO(){ return new Date().toISOString().slice(0,10); }
-    function showAuthError(msg){ const el=$('authError'); if(el){ el.textContent = msg; el.classList.remove('hidden'); } console.error(msg); }
-    function clearAuthError(){ const el=$('authError'); if(el){ el.textContent=''; el.classList.add('hidden'); } }
-    function toast(msg){ const el=$('toast'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),2300); }
-    function localDate(s){ return new Date(s + 'T00:00:00'); }
-    function iso(d){ return d.toISOString().slice(0,10); }
-    function addDays(s,n){ const d=localDate(s); d.setDate(d.getDate()+n); return iso(d); }
-    function dayDiff(a,b){ return Math.round((localDate(b)-localDate(a))/86400000); }
-    function startOfWeekISO(s){ const d=localDate(s); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return iso(d); }
-    function startOfMonthISO(s){ const d=localDate(s); return iso(new Date(d.getFullYear(),d.getMonth(),1)); }
-    function startOfQuarterISO(s){ const d=localDate(s); return iso(new Date(d.getFullYear(),Math.floor(d.getMonth()/3)*3,1)); }
-    function startOfYearISO(s){ const d=localDate(s); return iso(new Date(d.getFullYear(),0,1)); }
-    function addMonthsISO(s,n){ const d=localDate(s); d.setMonth(d.getMonth()+n); return iso(d); }
-    function statusLabel(v){ return ({'todo':'未开始','in-progress':'进行中','done':'已完成'}[v] || v); }
-    function normalize(){
-      state.people = Array.isArray(state.people) ? state.people : [];
-      state.projects = Array.isArray(state.projects) ? state.projects : [];
-      state.tasks = Array.isArray(state.tasks) ? state.tasks : [];
-      state.tasks.forEach(t=>{ t.personIds = Array.isArray(t.personIds) ? t.personIds : []; t.progress = Number(t.progress || 0); t.status = t.status || 'todo'; t.note = t.note || ''; });
-    }
-    function debounceSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveCloud,650); }
-
-    async function loadCloud(){
-      if(!currentUser || !supabaseClient) return;
-      const { data, error } = await supabaseClient.from('user_data').select('people,projects,tasks').eq('user_id', currentUser.id).maybeSingle();
-      if(error){ alert('加载失败：' + error.message); console.error(error); return; }
-      state = data ? { people:data.people||[], projects:data.projects||[], tasks:data.tasks||[] } : { people:[], projects:[], tasks:[] };
-      normalize();
-      if(!data) await saveCloud();
-      renderAll();
-    }
-
-    async function saveCloud(){
-      if(!currentUser || !supabaseClient) return;
-      normalize();
-      const { error } = await supabaseClient.from('user_data').upsert({
-        user_id: currentUser.id,
-        people: state.people,
-        projects: state.projects,
-        tasks: state.tasks,
-        updated_at: new Date().toISOString()
-      }, { onConflict:'user_id' });
-      if(error){ console.error(error); toast('保存失败：' + error.message); }
-    }
-
-    async function refreshSession(){
-      if(!supabaseClient) return;
-      const { data:{session}, error } = await supabaseClient.auth.getSession();
-      if(error){ showAuthError('读取登录状态失败：' + error.message); return; }
-      currentUser = session?.user || null;
-      if(currentUser){
-        $('authPanel').classList.add('hidden');
-        $('app').classList.remove('hidden');
-        $('userEmail').textContent = currentUser.email || currentUser.id;
-        await loadCloud();
-      }else{
-        $('authPanel').classList.remove('hidden');
-        $('app').classList.add('hidden');
-      }
-    }
-
-    async function login(){
-      clearAuthError();
-      console.log('登录按钮已点击');
-      if(!supabaseClient) return showAuthError('Supabase 尚未初始化。请检查 URL 和 Publishable key。');
-      const email=$('email').value.trim();
-      const password=$('password').value;
-      if(!email || !password) return alert('请输入邮箱和密码');
-      setAuthButtonsDisabled(true);
-      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      setAuthButtonsDisabled(false);
-      if(error){ alert('登录失败：' + error.message); console.error(error); return; }
-      await refreshSession();
-    }
-
-    async function signup(){
-      clearAuthError();
-      console.log('注册按钮已点击');
-      if(!supabaseClient) return showAuthError('Supabase 尚未初始化。请检查 URL 和 Publishable key。');
-      const email=$('email').value.trim();
-      const password=$('password').value;
-      if(!email || !password) return alert('请输入邮箱和密码');
-      if(password.length < 6) return alert('密码至少 6 位');
-      setAuthButtonsDisabled(true);
-      const { data, error } = await supabaseClient.auth.signUp({ email, password });
-      setAuthButtonsDisabled(false);
-      if(error){ alert('注册失败：' + error.message); console.error(error); return; }
-      if(data.session){ await refreshSession(); alert('注册成功，已自动登录'); }
-      else alert('注册成功。如果 Supabase 开启了邮箱确认，请先到邮箱点击确认链接后再登录。');
-    }
-
-    function setAuthButtonsDisabled(v){ $('loginBtn').disabled=v; $('signupBtn').disabled=v; }
-    async function logout(){ if(supabaseClient){ await supabaseClient.auth.signOut(); } currentUser=null; await refreshSession(); }
-
-    function addPerson(){
-      const name=$('personName').value.trim(); if(!name) return;
-      state.people.push({ id:uid('p'), name, color:$('personColor').value });
-      $('personName').value=''; renderAll(); debounceSave();
-    }
-    function deletePerson(id){
-      if(!confirm('删除该人员？相关任务会移除这个负责人。')) return;
-      state.people = state.people.filter(p=>p.id!==id);
-      state.tasks.forEach(t=>t.personIds=(t.personIds||[]).filter(pid=>pid!==id));
-      renderAll(); debounceSave();
-    }
-    function addProject(){
-      const name=$('projectName').value.trim(); if(!name) return;
-      state.projects.push({ id:uid('pr'), name });
-      $('projectName').value=''; renderAll(); debounceSave();
-    }
-    function deleteProject(id){
-      if(!confirm('删除该项目？该项目下的任务会变为“无项目”。')) return;
-      state.projects = state.projects.filter(p=>p.id!==id);
-      state.tasks.forEach(t=>{ if(t.projectId===id) t.projectId=null; });
-      renderAll(); debounceSave();
-    }
-
-    function fillTaskSelectors(t=null){
-      $('taskProject').innerHTML='<option value="">无项目</option>' + state.projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
-      $('taskProject').value=t?.projectId||'';
-      $('taskPeople').innerHTML=state.people.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
-      const ids=new Set(t?.personIds||[]); Array.from($('taskPeople').options).forEach(o=>o.selected=ids.has(o.value));
-    }
-    function openTaskModal(taskId=null){
-      const t = state.tasks.find(x=>x.id===taskId);
-      $('taskModalTitle').textContent = t ? '编辑任务' : '新建任务';
-      $('taskId').value = t?.id || '';
-      $('taskName').value = t?.name || '';
-      $('taskStatus').value = t?.status || 'todo';
-      $('taskStart').value = t?.startDate || todayISO();
-      $('taskEnd').value = t?.endDate || addDays(todayISO(), 7);
-      $('taskProgress').value = t?.progress || 0;
-      $('progressText').textContent = (t?.progress || 0) + '%';
-      $('taskNote').value = t?.note || '';
-      fillTaskSelectors(t);
-      $('deleteTaskBtn').classList.toggle('hidden', !t);
-      $('taskModal').classList.remove('hidden');
-    }
-    function closeTaskModal(){ $('taskModal').classList.add('hidden'); }
-    function saveTask(){
-      const id=$('taskId').value || uid('t');
-      const name=$('taskName').value.trim();
-      const startDate=$('taskStart').value;
-      const endDate=$('taskEnd').value;
-      if(!name || !startDate || !endDate) return alert('请填写任务名、开始日期和结束日期');
-      if(endDate < startDate) return alert('结束日期不能早于开始日期');
-      const item = {
-        id, name,
-        projectId:$('taskProject').value || null,
-        personIds:Array.from($('taskPeople').selectedOptions).map(o=>o.value),
-        startDate, endDate,
-        status:$('taskStatus').value,
-        progress:Number($('taskProgress').value),
-        note:$('taskNote').value.trim()
-      };
-      const idx=state.tasks.findIndex(t=>t.id===id);
-      if(idx>=0) state.tasks[idx]=item; else state.tasks.push(item);
-      closeTaskModal(); renderAll(); debounceSave();
-    }
-    function deleteCurrentTask(){
-      const id=$('taskId').value;
-      if(!id || !confirm('删除该任务？')) return;
-      state.tasks=state.tasks.filter(t=>t.id!==id);
-      closeTaskModal(); renderAll(); debounceSave();
-    }
-    function clearAll(){ if(confirm('确定清空当前账号下所有数据？')){ state={people:[],projects:[],tasks:[]}; renderAll(); saveCloud(); } }
-    function demo(){
-      if(state.tasks.length && !confirm('示例数据会覆盖当前数据，继续？')) return;
-      const base=todayISO();
-      state.people=[{id:'p1',name:'张伟',color:'#2563eb'},{id:'p2',name:'李娜',color:'#7c3aed'},{id:'p3',name:'王强',color:'#059669'}];
-      state.projects=[{id:'pr1',name:'NanoHema Panel 培训'},{id:'pr2',name:'cfDNA 试剂盒验证'}];
-      state.tasks=[
-        {id:'t1',projectId:'pr1',personIds:['p1'],name:'资料整理',startDate:addDays(base,-6),endDate:addDays(base,-1),status:'done',progress:100,note:''},
-        {id:'t2',projectId:'pr1',personIds:['p1','p2'],name:'PPT 讲稿优化',startDate:addDays(base,-1),endDate:addDays(base,4),status:'in-progress',progress:55,note:''},
-        {id:'t3',projectId:'pr2',personIds:['p3'],name:'提取性能测试',startDate:addDays(base,2),endDate:addDays(base,16),status:'todo',progress:0,note:''},
-        {id:'t4',projectId:'pr2',personIds:['p2','p3'],name:'建库兼容性验证',startDate:addDays(base,10),endDate:addDays(base,24),status:'todo',progress:0,note:''}
-      ];
-      renderAll(); saveCloud();
-    }
-    function exportData(){
-      const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='gantt-data.json'; a.click(); URL.revokeObjectURL(a.href);
-    }
-    function importData(file){
-      if(!file) return;
-      const reader=new FileReader();
-      reader.onload=e=>{
-        try{
-          const obj=JSON.parse(e.target.result);
-          if(!Array.isArray(obj.people)||!Array.isArray(obj.projects)||!Array.isArray(obj.tasks)) throw new Error('invalid');
-          state=obj; normalize(); renderAll(); saveCloud(); toast('导入成功');
-        }catch{ alert('JSON 格式不正确'); }
-      };
-      reader.readAsText(file);
-    }
-
-    function filteredTasks(){
-      const kw=keyword.trim().toLowerCase();
-      const tasks = state.tasks.filter(t=>{
-        if(!kw) return true;
-        const project=state.projects.find(p=>p.id===t.projectId);
-        const people=(t.personIds||[]).map(id=>state.people.find(p=>p.id===id)?.name||'').join(' ');
-        return [t.name, project?.name, people, t.note].join(' ').toLowerCase().includes(kw);
-      });
-      return tasks.sort((a,b)=>a.startDate.localeCompare(b.startDate));
-    }
-    function renderSidebar(){
-      $('peopleList').innerHTML = state.people.length ? state.people.map(p=>`
-        <div class="item"><div class="item-line"><span><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.name)}</span><button class="btn btn-sm" type="button" data-action="delete-person" data-id="${esc(p.id)}">删除</button></div></div>
-      `).join('') : '<div class="muted">暂无人员</div>';
-      $('projectList').innerHTML = state.projects.length ? state.projects.map(p=>`
-        <div class="item"><div class="item-line"><span>${esc(p.name)}</span><button class="btn btn-sm" type="button" data-action="delete-project" data-id="${esc(p.id)}">删除</button></div></div>
-      `).join('') : '<div class="muted">暂无项目</div>';
-      const tasks = filteredTasks();
-      $('taskList').innerHTML = tasks.length ? tasks.map(t=>{
-        const project=state.projects.find(p=>p.id===t.projectId);
-        const persons=(t.personIds||[]).map(id=>state.people.find(p=>p.id===id)).filter(Boolean);
-        const statusClass = t.status === 'in-progress' ? 'status-progress' : (t.status === 'done' ? 'status-done' : 'status-todo');
-        return `<div class="item task-card" data-action="open-task" data-id="${esc(t.id)}">
-          <div class="item-line"><strong>${esc(t.name)}</strong><span class="status ${statusClass}">${statusLabel(t.status)}</span></div>
-          <div class="muted">${esc(project?.name || '无项目')} · ${esc(t.startDate)} → ${esc(t.endDate)}</div>
-          <div class="muted">${persons.map(p=>`<span class="dot" style="background:${esc(p.color)}"></span>${esc(p.name)}`).join(' ') || '未分配'}</div>
-          <div class="progress"><span style="width:${Number(t.progress||0)}%"></span></div>
-        </div>`;
-      }).join('') : '<div class="muted">暂无任务</div>';
-    }
-
-    function makeUnits(min,max){
-      let start=min; let unitWidth=UNIT[gran]; let add=(s)=>addDays(s,1); let label=(s)=>s.slice(5); let sub='';
-      if(gran==='week'){ start=startOfWeekISO(min); add=s=>addDays(s,7); label=s=>'W' + getWeekNo(localDate(s)); sub=s=>s.slice(5); }
-      if(gran==='month'){ start=startOfMonthISO(min); add=s=>addMonthsISO(s,1); label=s=>s.slice(0,7); }
-      if(gran==='quarter'){ start=startOfQuarterISO(min); add=s=>addMonthsISO(s,3); label=s=>{const d=localDate(s);return d.getFullYear()+' Q'+(Math.floor(d.getMonth()/3)+1)}; }
-      if(gran==='year'){ start=startOfYearISO(min); add=s=>addMonthsISO(s,12); label=s=>s.slice(0,4); }
-      const units=[]; let cur=start; let guard=0;
-      while(cur<=max && guard++<800){ const next=add(cur); units.push({start:cur,end:addDays(next,-1),label:label(cur),sub:sub?sub(cur):'',days:Math.max(1,dayDiff(cur,next))}); cur=next; }
-      return {units,start,unitWidth};
-    }
-    function getWeekNo(d){ const date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const dayNum=date.getUTCDay()||7; date.setUTCDate(date.getUTCDate()+4-dayNum); const yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1)); return Math.ceil((((date-yearStart)/86400000)+1)/7); }
-    function isWeekend(s){ if(gran!=='day') return false; const d=localDate(s).getDay(); return d===0||d===6; }
-    function todayLine(start,width,pxPerDay){ const t=todayISO(); const left=Math.round(dayDiff(start,t)*pxPerDay); return left>=0&&left<=width ? `<div class="today-line" style="left:${left}px"></div>` : ''; }
-
-    function renderGantt(){
-      const tasks=filteredTasks();
-      $('ganttInfo').textContent=`共 ${tasks.length} 个任务`;
-      if(!tasks.length){ $('ganttTable').innerHTML='<div class="empty">暂无任务。请先新建任务，或加载示例数据。</div>'; return; }
-      let min=tasks.reduce((m,t)=>t.startDate<m?t.startDate:m,tasks[0].startDate);
-      let max=tasks.reduce((m,t)=>t.endDate>m?t.endDate:m,tasks[0].endDate);
-      min=addDays(min,-2); max=addDays(max,3);
-      const {units,start}=makeUnits(min,max);
-      const totalDays=dayDiff(start, addDays(units.at(-1).end,1));
-      const pxPerDay=UNIT[gran] / (gran==='day'?1:units[0].days);
-      const width=Math.max(900, Math.round(totalDays*pxPerDay));
-      const headUnits=units.map(u=>`<div class="unit" style="width:${Math.round(u.days*pxPerDay)}px"><div>${esc(u.label)}${u.sub?`<br><span class="muted">${esc(u.sub)}</span>`:''}</div></div>`).join('');
-      let html=`<div class="g-head"><div class="g-left">任务 / 项目 / 负责人</div><div class="g-right" style="width:${width}px">${headUnits}${todayLine(start,width,pxPerDay)}</div></div>`;
-      tasks.forEach(t=>{
-        const project=state.projects.find(p=>p.id===t.projectId);
-        const persons=(t.personIds||[]).map(id=>state.people.find(p=>p.id===id)).filter(Boolean);
-        const color=persons[0]?.color || '#2563eb';
-        const left=Math.max(0, Math.round(dayDiff(start,t.startDate)*pxPerDay));
-        const barWidth=Math.max(14, Math.round((dayDiff(t.startDate,t.endDate)+1)*pxPerDay));
-        const cells=units.map(u=>`<div class="unit ${isWeekend(u.start)?'weekend':''}" style="width:${Math.round(u.days*pxPerDay)}px"></div>`).join('');
-        html+=`<div class="g-row" style="height:var(--row-h)">
-          <div class="g-left"><div><strong>${esc(t.name)}</strong><div class="muted">${esc(project?.name||'无项目')} · ${persons.map(p=>esc(p.name)).join('、')||'未分配'}</div></div></div>
-          <div class="g-right" style="width:${width}px;height:var(--row-h)">${cells}${todayLine(start,width,pxPerDay)}
-            <div class="bar ${t.status==='done'?'done':''}" data-action="open-task" data-id="${esc(t.id)}" title="${esc(t.name)}：${esc(t.startDate)} 至 ${esc(t.endDate)}" style="left:${left}px;width:${barWidth}px;background:${esc(color)}">
-              <span class="bar-progress" style="width:${Number(t.progress||0)}%"></span><span style="position:relative;z-index:1">${esc(t.name)} · ${Number(t.progress||0)}%</span>
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="section-title">🔍 过滤</div>
+            <input type="text" id="searchKeyword" placeholder="搜索任务/人员..." style="width:100%; margin-bottom:16px;">
+            
+            <div class="section-title">👥 人员管理</div>
+            <div class="input-row">
+                <input type="text" id="personName" placeholder="姓名" style="flex:2;">
+                <input type="color" id="personColor" value="#3b82f6" style="width:40px;">
+                <button class="btn btn-primary btn-xs" onclick="addPerson()">+</button>
             </div>
-          </div>
-        </div>`;
-      });
-      $('ganttTable').innerHTML=html;
-    }
-    function renderAll(){ normalize(); renderSidebar(); fillTaskSelectors(); renderGantt(); }
+            <ul id="peopleList" style="list-style:none; margin-bottom:16px;"></ul>
+            
+            <div class="section-title">📁 项目</div>
+            <div class="input-row">
+                <input type="text" id="projectName" placeholder="项目名称" style="flex:2;">
+                <button class="btn btn-primary btn-xs" onclick="addProject()">+</button>
+            </div>
+            <ul id="projectsList" style="list-style:none; margin-bottom:16px;"></ul>
+            
+            <div class="section-title">📝 新建任务</div>
+            <input type="text" id="taskName" placeholder="任务名称" style="width:100%; margin-bottom:8px;">
+            <select id="taskProject" style="width:100%; margin-bottom:8px;"><option value="">无项目</option></select>
+            <select id="taskPerson" multiple size="2" style="width:100%; margin-bottom:8px;"></select>
+            <div class="input-row">
+                <input type="date" id="taskStartDate" style="flex:1;">
+                <input type="date" id="taskEndDate" style="flex:1;">
+            </div>
+            <select id="taskStatus" style="width:100%; margin-bottom:8px;">
+                <option value="todo">未开始</option>
+                <option value="in-progress">进行中</option>
+                <option value="done">已完成</option>
+            </select>
+            <div class="input-row">
+                <input type="range" id="taskProgress" min="0" max="100" value="0" style="flex:1;">
+                <span id="progVal">0%</span>
+            </div>
+            <button class="btn btn-primary btn-xs" onclick="addTask()" style="width:100%;">+ 添加任务</button>
+            <div id="tasksList" style="margin-top: 20px;"></div>
+        </div>
+        <div class="gantt-area">
+            <div class="gantt-toolbar">
+                <span id="ganttInfoText">📅 共 0 个任务</span>
+                <div class="granularity-bar" id="granularityBar">
+                    <button class="granularity-btn active" data-gran="day">按天</button>
+                    <button class="granularity-btn" data-gran="month">按月</button>
+                    <button class="granularity-btn" data-gran="quarter">按季度</button>
+                    <button class="granularity-btn" data-gran="year">按年</button>
+                </div>
+            </div>
+            <div class="gantt-scroll" id="ganttScroll">
+                <div class="gantt-table" id="ganttTable"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    function bindEvents(){
-      $('loginBtn').addEventListener('click', login);
-      $('signupBtn').addEventListener('click', signup);
-      $('password').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
-      $('email').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
-      $('logoutBtn').addEventListener('click', logout);
-      $('saveBtn').addEventListener('click', async()=>{ await saveCloud(); toast('已保存'); });
-      $('demoBtn').addEventListener('click', demo);
-      $('exportBtn').addEventListener('click', exportData);
-      $('importFile').addEventListener('change', e=>importData(e.target.files[0]));
-      $('clearBtn').addEventListener('click', clearAll);
-      $('addPersonBtn').addEventListener('click', addPerson);
-      $('addProjectBtn').addEventListener('click', addProject);
-      $('personName').addEventListener('keydown', e=>{ if(e.key==='Enter') addPerson(); });
-      $('projectName').addEventListener('keydown', e=>{ if(e.key==='Enter') addProject(); });
-      $('openTaskModalBtn').addEventListener('click', ()=>openTaskModal());
-      $('cancelTaskBtn').addEventListener('click', closeTaskModal);
-      $('saveTaskBtn').addEventListener('click', saveTask);
-      $('deleteTaskBtn').addEventListener('click', deleteCurrentTask);
-      $('taskProgress').addEventListener('input', e=>$('progressText').textContent=e.target.value+'%');
-      $('search').addEventListener('input', e=>{ keyword=e.target.value; renderAll(); });
-      $('granularity').addEventListener('click', e=>{
-        const btn=e.target.closest('button[data-gran]'); if(!btn) return;
-        gran=btn.dataset.gran;
-        document.querySelectorAll('#granularity button').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active'); renderGantt();
-      });
-      document.addEventListener('click', e=>{
-        const target=e.target.closest('[data-action]'); if(!target) return;
-        const action=target.dataset.action; const id=target.dataset.id;
-        if(action==='delete-person') deletePerson(id);
-        if(action==='delete-project') deleteProject(id);
-        if(action==='open-task') openTaskModal(id);
-      });
-      window.addEventListener('keydown',e=>{ if(e.key==='Escape') closeTaskModal(); });
-    }
+<script>
+// ========== 1. Supabase 配置 ==========
+// 注意：SUPABASE_URL 必须是项目根地址，不要带 /rest/v1/
+// 前端只能使用 Publishable key / anon public key，不能使用 Secret key / service_role key。
+const SUPABASE_URL = 'https://bymeuixlakbqeapoztqg.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Sg8GBHs3aQS0CuY71EEqAA_R4GKThED';
 
-    document.addEventListener('DOMContentLoaded', async()=>{
-      try{
-        bindEvents();
-        if(initSupabase()) await refreshSession();
-      }catch(err){
-        console.error(err);
-        showAuthError('页面初始化失败：' + (err.message || err));
-      }
+// CDN 加载后，SDK 位于 window.supabase。客户端实例不要命名为 supabase，避免与 SDK 全局对象冲突。
+const supabaseClient = window.supabase
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+    : null;
+
+function ensureSupabaseReady() {
+    if (!supabaseClient) {
+        console.error('Supabase SDK 未加载成功，请检查 CDN 网络或 script 标签。');
+        alert('Supabase SDK 未加载成功，请检查网络/CDN，或将 CDN 地址换成 unpkg。');
+        return false;
+    }
+    return true;
+}
+
+// ========== 全局变量 ==========
+let currentUser = null;
+let data = { people: [], projects: [], tasks: [] };
+let filterKw = '';
+let gran = 'day';
+let expanded = {};
+
+const UNIT_W = { day:28, month:56, quarter:80, year:100 };
+function getUW() { return UNIT_W[gran] || 28; }
+
+// ========== 云端数据操作 ==========
+async function loadUserData() {
+    if (!ensureSupabaseReady()) return;
+    if (!currentUser) return;
+    const { data: userData, error } = await supabaseClient
+        .from('user_data')
+        .select('people, projects, tasks')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+    if (error && error.code !== 'PGRST116') {
+        console.error(error);
+        alert('加载数据失败: ' + error.message);
+        return;
+    }
+    if (userData) {
+        data = userData;
+        // 兼容旧数据
+        (data.tasks || []).forEach(t => {
+            if (!t.personIds) t.personIds = [];
+            if (t.progress === undefined) t.progress = 0;
+            if (!t.subtasks) t.subtasks = [];
+        });
+    } else {
+        data = { people: [], projects: [], tasks: [] };
+        await saveUserData();
+    }
+    renderAll();
+}
+
+async function saveUserData() {
+    if (!ensureSupabaseReady()) return;
+    if (!currentUser) return;
+    const { error } = await supabaseClient
+        .from('user_data')
+        .upsert({
+            user_id: currentUser.id,
+            people: data.people,
+            projects: data.projects,
+            tasks: data.tasks,
+            updated_at: new Date()
+        }, { onConflict: 'user_id' });
+    if (error) console.error('保存失败', error);
+}
+
+async function syncData() {
+    await saveUserData();
+}
+
+// ========== 登录/注册/登出 ==========
+async function handleLogin() {
+    console.log('登录按钮已点击');
+    if (!ensureSupabaseReady()) return;
+    const email = document.getElementById('loginEmail').value.trim();
+    const pwd = document.getElementById('loginPassword').value.trim();
+    if (!email || !pwd) return alert('请输入邮箱和密码');
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pwd });
+    if (error) return alert('登录失败: ' + error.message);
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    currentUser = user;
+    await loadUserData();
+    document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('ganttApp').style.display = 'block';
+    document.getElementById('userEmailSpan').innerText = currentUser.email;
+}
+
+async function handleSignup() {
+    console.log('注册按钮已点击');
+    if (!ensureSupabaseReady()) return;
+    const email = document.getElementById('loginEmail').value.trim();
+    const pwd = document.getElementById('loginPassword').value.trim();
+    if (!email || !pwd) return alert('请输入邮箱和密码');
+    const { data: signUpData, error } = await supabaseClient.auth.signUp({ email, password: pwd });
+    if (error) return alert('注册失败: ' + error.message);
+    if (signUpData && signUpData.session) {
+        currentUser = signUpData.user;
+        await loadUserData();
+        document.getElementById('loginPanel').style.display = 'none';
+        document.getElementById('ganttApp').style.display = 'block';
+        document.getElementById('userEmailSpan').innerText = currentUser.email;
+        alert('注册成功，已自动登录。');
+    } else {
+        alert('注册成功！如果开启了邮箱确认，请先到邮箱点击确认链接；如果已关闭邮箱确认，请直接登录。');
+        document.getElementById('loginPassword').value = '';
+    }
+}
+
+async function handleLogout() {
+    if (!ensureSupabaseReady()) return;
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    document.getElementById('loginPanel').style.display = 'flex';
+    document.getElementById('ganttApp').style.display = 'none';
+}
+
+// ========== CRUD 操作 ==========
+window.addPerson = async () => {
+    const name = document.getElementById('personName').value.trim();
+    if (!name) return;
+    data.people.push({ id: Date.now().toString(36), name, color: document.getElementById('personColor').value });
+    document.getElementById('personName').value = '';
+    await syncData();
+    renderAll();
+};
+window.deletePerson = async (id) => {
+    if (!confirm('删除人员？')) return;
+    data.people = data.people.filter(p => p.id !== id);
+    data.tasks.forEach(t => t.personIds = (t.personIds || []).filter(pid => pid !== id));
+    await syncData();
+    renderAll();
+};
+window.addProject = async () => {
+    const name = document.getElementById('projectName').value.trim();
+    if (!name) return;
+    data.projects.push({ id: Date.now().toString(36), name });
+    document.getElementById('projectName').value = '';
+    await syncData();
+    renderAll();
+};
+window.deleteProject = async (id) => {
+    if (!confirm('删除项目及任务？')) return;
+    data.projects = data.projects.filter(p => p.id !== id);
+    data.tasks = data.tasks.filter(t => t.projectId !== id);
+    await syncData();
+    renderAll();
+};
+window.addTask = async () => {
+    const name = document.getElementById('taskName').value.trim();
+    const projId = document.getElementById('taskProject').value || null;
+    const pids = Array.from(document.getElementById('taskPerson').selectedOptions).map(o => o.value);
+    const start = document.getElementById('taskStartDate').value;
+    const end = document.getElementById('taskEndDate').value;
+    const status = document.getElementById('taskStatus').value;
+    const prog = parseInt(document.getElementById('taskProgress').value) || 0;
+    if (!name || !start || !end) return alert('请填写完整');
+    if (end < start) return alert('结束日期不能早于开始');
+    data.tasks.push({
+        id: Date.now().toString(36), projectId: projId, personIds: pids, name,
+        startDate: start, endDate: end, status, progress: prog, subtasks: []
     });
-  })();
-  </script>
+    await syncData();
+    renderAll();
+};
+window.deleteTask = async (id) => {
+    if (confirm('删除任务？')) {
+        data.tasks = data.tasks.filter(t => t.id !== id);
+        await syncData();
+        renderAll();
+    }
+};
+window.manualSave = async () => { await syncData(); alert('已保存到云端'); };
+window.loadDemoData = async () => {
+    if (data.tasks.length && !confirm('覆盖当前数据？')) return;
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const d = day => new Date(y, m, day).toISOString().slice(0,10);
+    data.people = [
+        { id:'p1', name:'张伟', color:'#3b82f6' },
+        { id:'p2', name:'李娜', color:'#8b5cf6' }
+    ];
+    data.projects = [{ id:'pr1', name:'产品发布' }];
+    data.tasks = [{
+        id:'t1', projectId:'pr1', personIds:['p1','p2'], name:'需求分析',
+        startDate:d(now.getDate()-5), endDate:d(now.getDate()+2), status:'done', progress:100, subtasks:[]
+    }];
+    await syncData();
+    renderAll();
+    alert('示例数据已加载');
+};
+window.exportData = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gantt.json'; a.click();
+};
+window.importData = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async ev => {
+        try {
+            const imp = JSON.parse(ev.target.result);
+            if (!imp.people || !imp.projects || !imp.tasks) throw new Error();
+            data = imp;
+            await syncData();
+            renderAll();
+            alert('导入成功');
+        } catch { alert('文件格式错误'); }
+    };
+    reader.readAsText(file);
+};
+window.clearAllData = async () => {
+    if (confirm('清空所有数据？不可恢复')) {
+        data = { people: [], projects: [], tasks: [] };
+        await syncData();
+        renderAll();
+        alert('已清空');
+    }
+};
+
+// ========== 渲染相关 ==========
+function renderSidebar() {
+    const peopleList = document.getElementById('peopleList');
+    peopleList.innerHTML = data.people.map(p => `<li style="display:flex; justify-content:space-between; margin-bottom:6px;"><span><span class="person-dot" style="background:${p.color};"></span>${p.name}</span><button class="btn btn-xs" onclick="deletePerson('${p.id}')">×</button></li>`).join('');
+    
+    const projList = document.getElementById('projectsList');
+    projList.innerHTML = data.projects.map(p => `<li style="display:flex; justify-content:space-between; margin-bottom:6px;">${p.name}<button class="btn btn-xs" onclick="deleteProject('${p.id}')">×</button></li>`).join('');
+    
+    const taskContainer = document.getElementById('tasksList');
+    taskContainer.innerHTML = data.tasks.map(t => {
+        const proj = data.projects.find(p => p.id === t.projectId);
+        const persons = (t.personIds || []).map(id => data.people.find(p => p.id === id)).filter(Boolean);
+        let statusClass = t.status === 'done' ? 'status-done' : (t.status === 'in-progress' ? 'status-progress' : 'status-todo');
+        return `<div class="task-card">
+            <div class="task-header" onclick="toggleExpand('${t.id}')">
+                <span>▶</span>
+                <div><strong>${t.name}</strong><br><span class="status-badge ${statusClass}">${t.status}</span> ${proj ? proj.name : '无项目'}</div>
+                <span>${t.progress || 0}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${t.progress || 0}%;"></div></div>
+            <div style="font-size:0.7rem;">${persons.map(p => `<span class="person-dot" style="background:${p.color};"></span>${p.name}`).join(' ')}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderGantt() {
+    const filtered = data.tasks.filter(t => {
+        if (!filterKw) return true;
+        const proj = data.projects.find(p => p.id === t.projectId);
+        return t.name.includes(filterKw) || (proj && proj.name.includes(filterKw)) ||
+               (t.personIds || []).some(pid => data.people.find(p => p.id === pid)?.name.includes(filterKw));
+    });
+    document.getElementById('ganttInfoText').innerText = `📅 共 ${filtered.length} 个任务`;
+    if (!filtered.length) {
+        document.getElementById('ganttTable').innerHTML = '<div style="padding:40px;text-align:center;">暂无任务</div>';
+        return;
+    }
+    // 简化甘特图渲染（为保证可用性，只显示任务列表）
+    let html = `<div class="gantt-header-row"><div class="gantt-left">任务</div><div class="gantt-right">时间</div></div>`;
+    filtered.forEach(t => {
+        html += `<div class="gantt-row"><div class="gantt-left">${t.name}</div><div class="gantt-right">${t.startDate} → ${t.endDate}</div></div>`;
+    });
+    document.getElementById('ganttTable').innerHTML = html;
+}
+
+function renderAll() {
+    const projSel = document.getElementById('taskProject');
+    projSel.innerHTML = '<option value="">无项目</option>' + data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    const personSel = document.getElementById('taskPerson');
+    personSel.innerHTML = data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    renderSidebar();
+    renderGantt();
+}
+
+window.toggleExpand = (id) => { expanded[id] = !expanded[id]; renderSidebar(); };
+window.applyFilter = () => { filterKw = document.getElementById('searchKeyword').value; renderGantt(); };
+document.getElementById('searchKeyword')?.addEventListener('input', () => { filterKw = document.getElementById('searchKeyword').value; renderGantt(); });
+
+// ========== 粒度切换（简化） ==========
+document.getElementById('granularityBar')?.addEventListener('click', e => {
+    const btn = e.target.closest('.granularity-btn');
+    if (btn) {
+        gran = btn.dataset.gran;
+        document.querySelectorAll('.granularity-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderGantt();
+    }
+});
+
+// ========== 事件绑定 ==========
+function bindEvent(id, eventName, handler) {
+    const el = document.getElementById(id);
+    if (!el) {
+        console.error('找不到元素 #' + id + '，事件未绑定');
+        return;
+    }
+    el.addEventListener(eventName, handler);
+}
+bindEvent('btnLogin', 'click', handleLogin);
+bindEvent('btnSignup', 'click', handleSignup);
+bindEvent('btnLogout', 'click', handleLogout);
+document.getElementById('taskProgress')?.addEventListener('input', e => document.getElementById('progVal').innerText = e.target.value + '%');
+
+// ========== 初始化 ==========
+(async function init() {
+    if (!ensureSupabaseReady()) return;
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        await loadUserData();
+        document.getElementById('loginPanel').style.display = 'none';
+        document.getElementById('ganttApp').style.display = 'block';
+        document.getElementById('userEmailSpan').innerText = currentUser.email;
+    } else {
+        document.getElementById('loginPanel').style.display = 'flex';
+        document.getElementById('ganttApp').style.display = 'none';
+    }
+})();
+</script>
 </body>
 </html>
