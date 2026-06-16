@@ -150,36 +150,61 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #eff6ff, #f8fafc 45%, #eef2ff);
-            padding: 24px;
+            padding: 28px;
+            background:
+                radial-gradient(circle at 18% 20%, rgba(59,130,246,.22), transparent 30%),
+                radial-gradient(circle at 82% 78%, rgba(16,185,129,.18), transparent 32%),
+                linear-gradient(135deg, #edf5ff 0%, #f8fafc 48%, #eef2ff 100%);
         }
         .auth-card {
-            width: min(420px, 94vw);
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: var(--shadow-md);
-            padding: 28px;
+            width: min(430px, 94vw);
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(226,232,240,.95);
+            border-radius: 24px;
+            box-shadow: 0 24px 70px rgba(15,23,42,.13);
+            padding: 32px;
+            backdrop-filter: blur(14px);
         }
-        .auth-title {
+        .auth-mark {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 1.35rem;
-            font-weight: 800;
+            justify-content: center;
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb, #60a5fa);
+            box-shadow: 0 12px 28px rgba(37,99,235,.28);
+            margin-bottom: 16px;
+            font-size: 1.25rem;
+        }
+        .auth-title {
+            font-size: 1.55rem;
+            font-weight: 850;
+            letter-spacing: -0.02em;
             margin-bottom: 8px;
         }
-        .auth-subtitle { color: var(--text-light); font-size: 0.9rem; margin-bottom: 18px; }
+        .auth-subtitle { color: var(--text-light); font-size: 0.92rem; margin-bottom: 22px; }
+        .auth-field { margin-bottom: 14px; }
+        .auth-field label { display:block; font-size:0.78rem; color:#475569; font-weight:700; margin-bottom: 6px; }
         .auth-card input {
             width: 100%;
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            margin: 6px 0 12px;
-            background: #fafbfc;
+            padding: 12px 13px;
+            border: 1px solid #d7dee8;
+            border-radius: 12px;
+            background: #fff;
+            outline: none;
+            transition: border-color .18s, box-shadow .18s, transform .18s;
         }
-        .auth-actions { display: grid; gap: 10px; margin-top: 4px; }
-        .auth-tip { margin-top: 14px; color: var(--text-light); font-size: 0.75rem; line-height: 1.6; }
+        .auth-card input:focus {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 4px rgba(59,130,246,.13);
+        }
+        .auth-actions { display: grid; gap: 10px; margin-top: 8px; }
+        .auth-actions .btn { justify-content:center; padding: 11px 16px; border-radius: 12px; font-size: .92rem; }
+        .auth-tip { min-height: 18px; margin-top: 14px; color: #64748b; font-size: 0.76rem; line-height: 1.6; }
+        .auth-error { color: #dc2626; }
+        .auth-success { color: #059669; }
         #appShell { height: 100vh; display: flex; flex-direction: column; }
         .user-pill {
             display: inline-flex;
@@ -238,19 +263,22 @@
 
 <div id="authPanel">
     <div class="auth-card">
-        <div class="auth-title"><span>📊</span><span>项目管理甘特图</span></div>
-        <div class="auth-subtitle">注册/登录后，每个账号独立保存自己的项目数据。</div>
-        <label style="font-size:0.8rem;color:var(--text-light);font-weight:600;">邮箱</label>
-        <input type="email" id="loginEmail" placeholder="name@example.com" autocomplete="email">
-        <label style="font-size:0.8rem;color:var(--text-light);font-weight:600;">密码</label>
-        <input type="password" id="loginPassword" placeholder="至少 6 位" autocomplete="current-password">
+        <div class="auth-mark">📊</div>
+        <div class="auth-title">项目管理甘特图</div>
+        <div class="auth-subtitle">登录后自动同步数据，每个账号独立保存项目、任务和子任务。</div>
+        <div class="auth-field">
+            <label>邮箱</label>
+            <input type="email" id="loginEmail" placeholder="name@example.com" autocomplete="email">
+        </div>
+        <div class="auth-field">
+            <label>密码</label>
+            <input type="password" id="loginPassword" placeholder="至少 6 位" autocomplete="current-password">
+        </div>
         <div class="auth-actions">
             <button class="btn btn-primary" id="btnLogin" type="button">登录</button>
             <button class="btn btn-outline" id="btnSignup" type="button">注册新账号</button>
         </div>
-        <div class="auth-tip" id="authTip">
-            如果 Supabase 后台开启邮箱确认，注册后需要先点击邮箱确认链接；如果关闭邮箱确认，则注册后可直接进入。
-        </div>
+        <div class="auth-tip" id="authTip"></div>
     </div>
 </div>
 
@@ -824,10 +852,16 @@
 
 
     // ========== 在线注册 / 登录 / 登出 ==========
-    function showAuth(message) {
+    function setAuthTip(message = '', type = '') {
+        authTip.textContent = message;
+        authTip.classList.remove('auth-error', 'auth-success');
+        if (type) authTip.classList.add(type);
+    }
+
+    function showAuth(message = '') {
         appShell.classList.add('hidden');
         authPanel.classList.remove('hidden');
-        if (message) authTip.textContent = message;
+        setAuthTip(message);
     }
 
     function showApp() {
@@ -848,7 +882,7 @@
     async function handleLogin() {
         console.log('登录按钮已点击');
         if (!supabaseClient) {
-            alert('Supabase 未初始化。请检查 SUPABASE_URL 和 SUPABASE_PUBLISHABLE_KEY 是否已替换。');
+            alert('系统连接未完成，请联系管理员。');
             return;
         }
 
@@ -876,7 +910,7 @@
     async function handleSignup() {
         console.log('注册按钮已点击');
         if (!supabaseClient) {
-            alert('Supabase 未初始化。请检查 SUPABASE_URL 和 SUPABASE_PUBLISHABLE_KEY 是否已替换。');
+            alert('系统连接未完成，请联系管理员。');
             return;
         }
 
@@ -886,21 +920,31 @@
         if (!email || !password) return alert('请输入邮箱和密码');
         if (password.length < 6) return alert('密码至少 6 位');
 
+        setAuthTip('正在创建账号...', '');
         const { data: signupData, error } = await supabaseClient.auth.signUp({ email, password });
         if (error) {
             console.error('注册失败：', error);
+            setAuthTip('', '');
             alert('注册失败：' + error.message);
             return;
         }
 
-        // 关闭邮箱确认时，signUp 会直接返回 session；开启邮箱确认时，session 为空。
+        // 后台已关闭邮箱确认时，signUp 会直接返回 session；这里同时兼容少数未立即返回 session 的情况，自动再登录一次。
         if (signupData.session) {
             currentUser = signupData.user;
-            await initAfterLogin();
-            alert('注册成功，已自动登录。');
         } else {
-            alert('注册成功。当前项目可能开启了邮箱确认，请先到邮箱点击确认链接后再登录。');
+            const { data: loginData, error: loginError } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (loginError) {
+                console.error('注册后自动登录失败：', loginError);
+                setAuthTip('', '');
+                alert('注册成功，但自动登录失败，请直接点击登录。');
+                return;
+            }
+            currentUser = loginData.user;
         }
+
+        setAuthTip('注册成功，正在进入...', 'auth-success');
+        await initAfterLogin();
     }
 
     async function handleLogout() {
@@ -916,11 +960,12 @@
         document.getElementById('btnLogout').addEventListener('click', handleLogout);
 
         if (!window.supabase) {
-            showAuth('Supabase SDK 未加载成功。请检查网络，或把 CDN 换成 unpkg。');
+            showAuth('系统组件加载失败，请检查网络后刷新页面。');
             return;
         }
         if (!supabaseClient) {
-            showAuth('请先在 HTML 底部脚本中填写 SUPABASE_URL 和 SUPABASE_PUBLISHABLE_KEY。');
+            console.warn('Supabase client is not initialized. Please configure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in the script.');
+            showAuth('');
             return;
         }
 
