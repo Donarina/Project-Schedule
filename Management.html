@@ -261,13 +261,34 @@ async function login(){
   if(error) return alert('登录失败：' + error.message);
   await refreshSession();
 }
-async function signup(){
-  const email=$('email').value.trim(); const password=$('password').value;
-  if(!email || !password) return alert('请输入邮箱和密码');
-  if(password.length < 6) return alert('密码至少 6 位');
-  const { error } = await supabase.auth.signUp({ email, password });
-  if(error) return alert('注册失败：' + error.message);
-  alert('注册成功。如果项目开启邮箱确认，请先去邮箱点击确认链接；否则可以直接登录。');
+async function signup() {
+  const email = $('email').value.trim();
+  const password = $('password').value;
+
+  if (!email || !password) {
+    return alert('请输入邮箱和密码');
+  }
+
+  if (password.length < 6) {
+    return alert('密码至少 6 位');
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    return alert('注册失败：' + error.message);
+  }
+
+  if (data.session) {
+    currentUser = data.user;
+    await refreshSession();
+    toast('注册成功，已自动登录');
+  } else {
+    alert('注册成功，请先到邮箱点击确认链接后再登录。');
+  }
 }
 async function logout(){ await supabase.auth.signOut(); currentUser=null; await refreshSession(); }
 
