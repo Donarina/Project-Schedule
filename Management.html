@@ -189,9 +189,9 @@
 <script>
 const SUPABASE_URL = 'https://bymeuixlakbqeapoztqg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Sg8GBHs3aQS0CuY71EEqAA_R4GKThED';
-const supabase = window.supabase.createClient(
+const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY
+  SUPABASE_ANON_KEY
 );
 
 let currentUser = null;
@@ -224,7 +224,7 @@ function debounceSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveCloud
 
 async function loadCloud(){
   if(!currentUser) return;
-  const { data, error } = await supabase.from('user_data').select('people,projects,tasks').eq('user_id', currentUser.id).maybeSingle();
+  const { data, error } = await supabaseClient.from('user_data').select('people,projects,tasks').eq('user_id', currentUser.id).maybeSingle();
   if(error){ alert('加载失败：' + error.message); return; }
   state = data ? { people:data.people||[], projects:data.projects||[], tasks:data.tasks||[] } : { people:[], projects:[], tasks:[] };
   normalize();
@@ -234,7 +234,7 @@ async function loadCloud(){
 async function saveCloud(){
   if(!currentUser) return;
   normalize();
-  const { error } = await supabase.from('user_data').upsert({
+  const { error } = await supabaseClient.from('user_data').upsert({
     user_id: currentUser.id,
     people: state.people,
     projects: state.projects,
@@ -245,7 +245,7 @@ async function saveCloud(){
 }
 
 async function refreshSession(){
-  const { data:{session} } = await supabase.auth.getSession();
+  const { data:{session} } = await supabaseClient.auth.getSession();
   currentUser = session?.user || null;
   if(currentUser){
     $('authPanel').classList.add('hidden'); $('app').classList.remove('hidden'); $('userEmail').textContent = currentUser.email;
@@ -257,9 +257,9 @@ async function refreshSession(){
 async function login(){
   const email=$('email').value.trim(); const password=$('password').value;
   if(!email || !password) return alert('请输入邮箱和密码');
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if(error) return alert('登录失败：' + error.message);
-  await refreshSession();
+  const { data: { session } } = await supabaseClient.auth.getSession();
 }
 async function signup() {
   const email = $('email').value.trim();
@@ -273,7 +273,7 @@ async function signup() {
     return alert('密码至少 6 位');
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseClient.auth.signUp({
     email,
     password
   });
@@ -290,7 +290,7 @@ async function signup() {
     alert('注册成功，请先到邮箱点击确认链接后再登录。');
   }
 }
-async function logout(){ await supabase.auth.signOut(); currentUser=null; await refreshSession(); }
+async function logout(){ await supabaseClient.auth.signOut(); currentUser=null; await refreshSession(); }
 
 function addPerson(){
   const name=$('personName').value.trim(); if(!name) return;
