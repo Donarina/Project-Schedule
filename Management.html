@@ -102,22 +102,41 @@
         .person-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; background: #f1f5f9; }
         .person-dot { width: 7px; height: 7px; border-radius: 50%; }
         /* 甘特图区域 */
-        .gantt-area { flex: 1; display: flex; flex-direction: column; background: #fff; }
+        .gantt-area { flex: 1; min-width: 0; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fff; }
         .gantt-toolbar {
+            flex: 0 0 auto; width: 100%; min-width: 0;
             display: flex; align-items: center; justify-content: space-between;
             padding: 8px 16px; border-bottom: 1px solid var(--border); background: #fafbfc; gap: 16px;
+            position: sticky; top: 0; z-index: 30;
         }
-        .granularity-bar { display: flex; gap: 2px; background: #f1f5f9; border-radius: 20px; padding: 2px; }
+        #ganttInfoText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .granularity-bar { flex: 0 0 auto; margin-left: auto; display: flex; gap: 2px; background: #f1f5f9; border-radius: 20px; padding: 2px; }
         .granularity-btn {
             padding: 6px 14px; border: none; background: transparent; border-radius: 20px;
             cursor: pointer; font-size: 0.8rem; font-weight: 500; color: var(--text-light); transition: 0.2s;
         }
         .granularity-btn.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
-        .gantt-scroll { flex: 1; overflow: auto; max-width: 100%; min-width: 0; scrollbar-gutter: stable both-edges; }
+        .gantt-scroll { flex: 1; overflow: auto; width: 100%; max-width: 100%; min-width: 0; scrollbar-gutter: stable both-edges; }
         .gantt-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
         .gantt-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
         .gantt-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; border: 3px solid #f1f5f9; }
         .gantt-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* 固定可视窗口：按天默认只展示今天前后约15天，其余通过底部横向滚动条查看 */
+        .gantt-scroll.fixed-window {
+            width: min(100%, calc(var(--left-w) + var(--timeline-window-w, 868px)));
+            max-width: 100%;
+            align-self: flex-start;
+            border-right: 1px solid #eef2f7;
+        }
+        @media (max-width: 1200px) {
+            .gantt-scroll.fixed-window { width: 100%; }
+        }
+        @media (max-width: 700px) {
+            .gantt-toolbar { align-items: flex-start; }
+            .granularity-bar { width: 100%; overflow-x: auto; justify-content: flex-start; }
+            .granularity-btn { flex: 0 0 auto; }
+        }
+
         .gantt-table { display: flex; flex-direction: column; width: max-content; min-width: 100%; }
         .gantt-header-row { display: flex; position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 2px solid var(--border); height: var(--gantt-header-h); }
         .gantt-left { width: var(--left-w); min-width: var(--left-w); position: sticky; left: 0; background: #fff; padding: 0 16px; border-right: 2px solid var(--border); display: flex; align-items: flex-end; font-weight: 700; font-size: 0.8rem; }
@@ -455,7 +474,7 @@
                 <button class="granularity-btn" data-gran="year">按年</button>
             </div>
         </div>
-        <div class="gantt-scroll" id="ganttScroll">
+        <div class="gantt-scroll fixed-window" id="ganttScroll">
             <div class="gantt-table" id="ganttTable"></div>
         </div>
     </div>
@@ -898,6 +917,7 @@
         const { start, end } = getRange();
         const units = genUnits(start, end);
         const uw = getUW();
+        updateGanttViewportWindow(uw);
         const upper = genUpper(units);
         const todayLine = getTodayLine(units, uw);
 
@@ -970,6 +990,13 @@
         }
     }
 
+    function updateGanttViewportWindow(uw) {
+        const scroll = document.getElementById('ganttScroll');
+        if (!scroll) return;
+        const visibleUnits = gran === 'day' ? 31 : (gran === 'week' ? 10 : (gran === 'month' ? 12 : (gran === 'quarter' ? 8 : 5)));
+        scroll.style.setProperty('--timeline-window-w', (visibleUnits * uw) + 'px');
+    }
+
     function centerGanttOnToday(units, uw) {
         const scroll = document.getElementById('ganttScroll');
         if (!scroll || !units || !units.length) return;
@@ -977,21 +1004,18 @@
         const todayPos = getTodayLine(units, uw);
         if (todayPos < 0) return;
 
-        // 注意：ganttScroll 的 scrollLeft 是从整张表最左侧开始计算的，
-        // 其中包含左侧固定任务列 var(--left-w)。今天线的位置 todayPos
-        // 是在右侧时间轴内部的坐标，所以必须加上左侧列宽。
         const leftCol = document.querySelector('.gantt-left')?.offsetWidth || 0;
         const timelineViewport = Math.max(240, scroll.clientWidth - leftCol);
         const fullContentWidth = document.getElementById('ganttTable')?.scrollWidth || scroll.scrollWidth;
 
         let targetLeft;
         if (gran === 'day') {
-            // 按天视图：默认让可视区域从“今天前 15 天”开始，
-            // 今天位于时间轴可视区域中间附近，后续日期通过底部横向滚动条查看。
-            targetLeft = leftCol + todayPos - 15 * uw;
+            // scrollLeft 的坐标以右侧时间轴为有效参照：
+            // 让可视时间轴从“今天前15天”开始，今天自然落在中间附近。
+            targetLeft = todayPos - 15 * uw;
         } else {
-            // 周/月/季度/年：默认把今天居中。
-            targetLeft = leftCol + todayPos - timelineViewport / 2;
+            // 周/月/季度/年：默认把今天放在当前可视时间窗口中心附近。
+            targetLeft = todayPos - timelineViewport / 2;
         }
 
         const maxLeft = Math.max(0, fullContentWidth - scroll.clientWidth);
@@ -1317,6 +1341,11 @@
         if (currentUser) await initAfterLogin();
         else showAuth();
     }
+
+    window.addEventListener('resize', () => {
+        updateGanttViewportWindow(getUW());
+        if (data.tasks.length) requestAnimationFrame(() => centerGanttOnToday(genUnits(getRange().start, getRange().end), getUW()));
+    });
 
     // 启动
     initAuth();
