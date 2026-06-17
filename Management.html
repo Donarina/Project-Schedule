@@ -116,7 +116,7 @@
             cursor: pointer; font-size: 0.8rem; font-weight: 500; color: var(--text-light); transition: 0.2s;
         }
         .granularity-btn.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
-        .gantt-scroll { flex: 1; overflow: auto; width: 100%; max-width: 100%; min-width: 0; scrollbar-gutter: stable both-edges; }
+        .gantt-scroll { flex: 1; overflow: auto; width: 100%; max-width: 100%; min-width: 0; scrollbar-gutter: stable both-edges; position: relative; }
         .gantt-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
         .gantt-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
         .gantt-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; border: 3px solid #f1f5f9; }
@@ -127,6 +127,7 @@
             max-width: 100%;
             align-self: flex-start;
             border-right: 1px solid #eef2f7;
+            background: #fff;
         }
         @media (max-width: 1200px) {
             .gantt-scroll.fixed-window { width: 100%; }
@@ -138,26 +139,28 @@
         }
 
         .gantt-table { display: flex; flex-direction: column; width: max-content; min-width: 100%; }
-        .gantt-header-row { display: flex; position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 2px solid var(--border); height: var(--gantt-header-h); }
-        .gantt-left { width: var(--left-w); min-width: var(--left-w); position: sticky; left: 0; background: #fff; padding: 0 16px; border-right: 2px solid var(--border); display: flex; align-items: flex-end; font-weight: 700; font-size: 0.8rem; }
-        .gantt-right { flex: 1; display: flex; flex-direction: column; }
+        .gantt-header-row { display: flex; position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 2px solid var(--border); height: var(--gantt-header-h); width: max-content; min-width: 100%; }
+        .gantt-left { width: var(--left-w); min-width: var(--left-w); flex: 0 0 var(--left-w); position: sticky; left: 0; z-index: 12; background: #fff; padding: 0 16px; border-right: 2px solid var(--border); display: flex; align-items: flex-end; font-weight: 700; font-size: 0.8rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .gantt-right { flex: 0 0 var(--timeline-total-w, auto); width: var(--timeline-total-w, auto); display: flex; flex-direction: column; position: relative; }
         .gantt-upper-row { display: flex; height: 22px; }
         .gantt-upper-label { display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; background: #f9fafb; border-right: 1px solid #eef2f6; }
         .gantt-lower-row { display: flex; height: 28px; }
         .gantt-unit { display: flex; align-items: center; justify-content: center; font-size: 0.68rem; border-right: 1px solid #f1f5f9; color: var(--text-light); }
         .gantt-unit.weekend { background: #f8fafc; }
         .gantt-body { display: flex; flex-direction: column; }
-        .gantt-row { display: flex; height: var(--gantt-row-h); border-bottom: 1px solid #f1f5f9; transition: background 0.15s; }
+        .gantt-row { display: flex; height: var(--gantt-row-h); border-bottom: 1px solid #f1f5f9; transition: background 0.15s; width: max-content; min-width: 100%; }
         .gantt-row:hover { background: #fafcff; }
         .gantt-row.project-group { background: #f8fafc; font-weight: 600; height: 36px; }
         .gantt-row.subtask-row { height: 32px; background: #fdfdfd; }
-        .gantt-row-left { width: var(--left-w); min-width: var(--left-w); position: sticky; left: 0; background: inherit; display: flex; align-items: center; padding: 0 16px; gap: 8px; border-right: 1px solid #eef2f6; font-size: 0.8rem; overflow: hidden; }
-        .gantt-row-left .task-expand { cursor: pointer; }
-        .gantt-row-right { flex: 1; position: relative; display: flex; }
+        .gantt-row-left { width: var(--left-w); min-width: var(--left-w); flex: 0 0 var(--left-w); position: sticky; left: 0; z-index: 8; background: inherit; display: flex; align-items: center; padding: 0 16px; gap: 8px; border-right: 1px solid #eef2f6; font-size: 0.8rem; overflow: hidden; white-space: nowrap; }
+        .gantt-row-left .task-expand { cursor: pointer; flex: 0 0 16px; }
+        .gantt-row-left .progress-bar { flex: 0 0 50px; width: 50px !important; min-width: 50px; max-width: 50px; }
+        .gantt-row-left .task-edit-btn { flex: 0 0 auto; }
+        .gantt-row-right { flex: 0 0 var(--timeline-total-w, auto); width: var(--timeline-total-w, auto); position: relative; display: flex; overflow: hidden; }
         .gantt-bg { border-right: 1px solid #f5f6f8; flex-shrink: 0; }
         .gantt-bg.weekend-bg { background: #f8fafc; }
         .gantt-bar {
-            position: absolute; top: 6px; height: calc(var(--gantt-row-h) - 12px); border-radius: 5px;
+            position: absolute; top: 7px; height: calc(var(--gantt-row-h) - 14px); border-radius: 6px;
             cursor: pointer; z-index: 2; display: flex; align-items: center; padding: 0 8px;
             font-size: 0.7rem; color: #fff; white-space: nowrap; overflow: hidden; min-width: 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.12); transition: filter 0.2s;
@@ -917,6 +920,8 @@
         const { start, end } = getRange();
         const units = genUnits(start, end);
         const uw = getUW();
+        const timelineW = units.length * uw;
+        table.style.setProperty('--timeline-total-w', timelineW + 'px');
         updateGanttViewportWindow(uw);
         const upper = genUpper(units);
         const todayLine = getTodayLine(units, uw);
@@ -929,14 +934,14 @@
         });
         data.projects.forEach(p => { if (map[p.id].tasks.length) groups.push(map[p.id]); });
 
-        let html = `<div class="gantt-header-row"><div class="gantt-left">任务 / 项目</div><div class="gantt-right">`;
+        let html = `<div class="gantt-header-row"><div class="gantt-left">任务 / 项目</div><div class="gantt-right" style="width:${timelineW}px; flex-basis:${timelineW}px;">`;
         if (upper.length) { html += '<div class="gantt-upper-row">'; upper.forEach(u => html += `<div class="gantt-upper-label" style="width:${u.width}px">${u.label}</div>`); html += '</div>'; }
         html += '<div class="gantt-lower-row">';
         units.forEach(u => html += `<div class="gantt-unit${u.weekend?' weekend':''}" style="width:${uw}px">${u.label}</div>`);
         html += '</div></div></div><div class="gantt-body">';
 
         groups.forEach(g => {
-            html += `<div class="gantt-row project-group"><div class="gantt-row-left">📌 ${g.project?.name || '未分类'} (${g.tasks.length})</div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}${todayLine>=0?`<div class="today-line" style="left:${todayLine}px"></div>`:''}</div></div>`;
+            html += `<div class="gantt-row project-group"><div class="gantt-row-left">📌 ${g.project?.name || '未分类'} (${g.tasks.length})</div><div class="gantt-row-right" style="width:${timelineW}px; flex-basis:${timelineW}px;">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}${todayLine>=0?`<div class="today-line" style="left:${todayLine}px"></div>`:''}</div></div>`;
             g.tasks.forEach(t => {
                 const color = getTaskColor(t);
                 const pos = getBarPos(t, units, uw);
@@ -950,7 +955,7 @@
                     <div class="progress-bar" style="width:50px; margin:0;"><div class="progress-fill" style="width:${progress}%;"></div></div>
                     <span style="font-size:0.65rem; margin-left:4px;">${progress}%</span>
                     <button class="task-edit-btn" onclick="openEditTask('${t.id}')">编辑</button>
-                </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}`;
+                </div><div class="gantt-row-right" style="width:${timelineW}px; flex-basis:${timelineW}px;">${units.map(u => `<div class="gantt-bg${u.weekend?' weekend-bg':''}" style="width:${uw}px"></div>`).join('')}`;
                 if (pos) {
                     const left = Math.max(0, pos.left), width = Math.min(pos.width, units.length*uw - left);
                     const doneClass = (displayStatus === 'done' || progress === 100) ? ' task-done' : '';
@@ -969,7 +974,7 @@
                             <span style="${sub.done?'text-decoration:line-through; color:#999':''}">${sub.name}</span>
                             <span style="font-size:0.6rem;">${subPersons.map(p => p.name).join(',')}</span>
                             <button class="btn btn-danger btn-xs" style="margin-left:auto;" onclick="deleteSub('${t.id}','${sub.id}')">×</button>
-                        </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg" style="width:${uw}px"></div>`).join('')}</div></div>`;
+                        </div><div class="gantt-row-right" style="width:${timelineW}px; flex-basis:${timelineW}px;">${units.map(u => `<div class="gantt-bg" style="width:${uw}px"></div>`).join('')}</div></div>`;
                     });
                     // 添加子任务行
                     html += `<div class="gantt-row subtask-row"><div class="gantt-row-left" style="padding-left:30px; display:flex; gap:4px; align-items:center;">
@@ -978,7 +983,7 @@
                             ${data.people.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
                         </select>
                         <button class="btn btn-primary btn-xs" onclick="addSub('${t.id}', document.getElementById('ganttSubName_${t.id}'), document.getElementById('ganttSubPerson_${t.id}'))">+</button>
-                    </div><div class="gantt-row-right">${units.map(u => `<div class="gantt-bg" style="width:${uw}px"></div>`).join('')}</div></div>`;
+                    </div><div class="gantt-row-right" style="width:${timelineW}px; flex-basis:${timelineW}px;">${units.map(u => `<div class="gantt-bg" style="width:${uw}px"></div>`).join('')}</div></div>`;
                 }
             });
         });
@@ -1010,12 +1015,12 @@
 
         let targetLeft;
         if (gran === 'day') {
-            // scrollLeft 的坐标以右侧时间轴为有效参照：
-            // 让可视时间轴从“今天前15天”开始，今天自然落在中间附近。
-            targetLeft = todayPos - 15 * uw;
+            // scrollLeft 是整个表格的横向坐标，前面包含左侧固定列；
+            // 因此必须加上 leftCol，才能让右侧时间轴显示“今天前15天～后15天”。
+            targetLeft = leftCol + todayPos - 15 * uw;
         } else {
             // 周/月/季度/年：默认把今天放在当前可视时间窗口中心附近。
-            targetLeft = todayPos - timelineViewport / 2;
+            targetLeft = leftCol + todayPos - timelineViewport / 2;
         }
 
         const maxLeft = Math.max(0, fullContentWidth - scroll.clientWidth);
